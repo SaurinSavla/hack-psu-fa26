@@ -96,6 +96,14 @@
       <button class="icon-btn sm" id="turnRight" title="Spin the sculpture (E)" aria-label="Spin the sculpture right">▶</button>
       <button class="icon-btn sm" id="peekBtn" title="Peek from the audience's side (V)" aria-label="Peek at the sculpture from the audience's side">👁</button>
     </div>
+    <div class="rot-bar hidden" id="rotBar" role="toolbar" aria-label="Rotate the shape">
+      <small>Rotate</small>
+      <button class="ax ax-x" data-ax="x" aria-label="Rotate around X (tip forward)">X<i>⤼</i></button>
+      <button class="ax ax-y" data-ax="y" aria-label="Rotate around Y (spin)">Y<i>⟳</i></button>
+      <button class="ax ax-z" data-ax="z" aria-label="Rotate around Z (roll)">Z<i>↻</i></button>
+      <button class="ax ax-0" data-ax="reset" aria-label="Reset rotation">⟲</button>
+    </div>
+    <div class="toast hidden" id="drawToast"></div>
     <div class="coach" id="coach"></div>
     <div class="help-card hidden" id="helpCard" role="dialog" aria-label="How to sculpt">
       <div class="help-head"><b>How to sculpt ✨</b><button class="icon-btn sm" id="helpClose" aria-label="Close">✕</button></div>

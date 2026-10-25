@@ -96,7 +96,9 @@ export class MotionInput {
       const spin = Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0); // degrees per second
       if (spin > 320 && now - this.lastFlick > 900) {
         this.lastFlick = now;
-        this.flickHandlers.forEach((fn) => fn());
+        // Pass the rotation rates (°/s) so handlers can tell which way the wrist flicked.
+        const rate = { alpha: rr.alpha || 0, beta: rr.beta || 0, gamma: rr.gamma || 0 };
+        this.flickHandlers.forEach((fn) => fn(rate));
       }
     }
     if (mag > 15) {

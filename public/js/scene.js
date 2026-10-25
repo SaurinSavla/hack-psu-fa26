@@ -21,6 +21,7 @@ const smoothstep = (a, b, x) => {
 const IDENTITY = new THREE.Matrix4();
 const tmpM1 = new THREE.Matrix4();
 const tmpM2 = new THREE.Matrix4();
+const tmpM3 = new THREE.Matrix4();
 
 export class Sculpture {
   constructor(canvas, opts = {}) {
@@ -69,7 +70,7 @@ export class Sculpture {
     this.root = new THREE.Group();
     this.root.matrixAutoUpdate = false; // driven by the turntable
     scene.add(this.root);
-    this.turn = { angle: 0, target: 0, pivot: new THREE.Vector3(0, 0, -1) };
+    this.turn = { angle: 0, target: 0, tilt: 0, tiltTarget: 0, pivot: new THREE.Vector3(0, 0, -1) };
     this.turnMatrix = new THREE.Matrix4();
     this.turnInverse = new THREE.Matrix4();
     this.drawerEye = new THREE.Vector3(); // where the sculptor stands, in sculpture space
@@ -319,6 +320,7 @@ export class Sculpture {
     this.ghost.position.copy(g.center);
     this.ghost.quaternion.copy(g.q);
     this.ghost.scale.setScalar(g.k);
+    this.ghost.material.opacity = g.preview ? 0.28 : 0.55;
     this.ghost.visible = true;
   }
 
@@ -350,16 +352,35 @@ export class Sculpture {
   /** Spin the sculpture by `delta` radians around a vertical axis, so its sides and back face the drawer. */
   turnBy(delta) {
     const tr = this.turn;
-    if (!tr.angle && !tr.target) {
+    this._maybeSetPivot();
+    tr.target += delta;
+  }
+
+  /** Tip the sculpture towards you (positive: see its top) or away (negative: see its bottom). */
+  tiltBy(delta) {
+    const tr = this.turn;
+    this._maybeSetPivot();
+    tr.tiltTarget = Math.max(-1.5, Math.min(1.5, tr.tiltTarget + delta));
+  }
+
+  /** Back to the plain front view. */
+  resetView() {
+    this.turn.target = Math.round(this.turn.target / TAU) * TAU;
+    this.turn.tiltTarget = 0;
+  }
+
+  _maybeSetPivot() {
+    const tr = this.turn;
+    if (!tr.angle && !tr.target && !tr.tilt && !tr.tiltTarget) {
       // Spin around the middle of what has been sculpted so far (or the usual sculpting spot).
       const c = this.bbox.isEmpty() ? new THREE.Vector3(0, 0, -1) : this.bbox.getCenter(new THREE.Vector3());
-      tr.pivot.set(c.x, 0, c.z);
+      tr.pivot.set(c.x, c.y, c.z);
     }
-    tr.target += delta;
   }
 
   resetTurn() {
     this.turn.angle = this.turn.target = 0;
+    this.turn.tilt = this.turn.tiltTarget = 0;
     this._applyTurn();
   }
 
@@ -374,27 +395,32 @@ export class Sculpture {
   }
 
   _applyTurn() {
-    const { angle, pivot } = this.turn;
+    const { angle, tilt, pivot } = this.turn;
+    // Spin around the sculpture's own vertical axis, then tip it towards / away from you.
     this.turnMatrix
       .makeTranslation(pivot.x, pivot.y, pivot.z)
-      .multiply(tmpM1.makeRotationY(angle))
+      .multiply(tmpM1.makeRotationX(tilt))
+      .multiply(tmpM3.makeRotationY(angle))
       .multiply(tmpM2.makeTranslation(-pivot.x, -pivot.y, -pivot.z));
     this.turnInverse.copy(this.turnMatrix).invert();
     // Only the drawer's own view is spun; everyone else (and a peeking drawer) sees the sculpture as stored.
     this.root.matrix.copy(this.mode === 'drawer' ? this.turnMatrix : IDENTITY);
     this.root.matrixWorldNeedsUpdate = true;
-    if (this.mode === 'drawer') this.frontMarker.visible = Math.abs(angle) < 0.02;
+    if (this.mode === 'drawer') this.frontMarker.visible = Math.abs(angle) < 0.02 && Math.abs(tilt) < 0.02;
   }
 
   _stepTurn(dt) {
     const tr = this.turn;
-    if (tr.angle === tr.target) return;
-    tr.angle += (tr.target - tr.angle) * (this.instant ? 1 : 1 - Math.exp(-dt * 10));
+    if (tr.angle === tr.target && tr.tilt === tr.tiltTarget) return;
+    const k = this.instant ? 1 : 1 - Math.exp(-dt * 10);
+    tr.angle += (tr.target - tr.angle) * k;
+    tr.tilt += (tr.tiltTarget - tr.tilt) * k;
     if (Math.abs(tr.target - tr.angle) < 0.002) {
       // Settled: wrap full turns so the angle stays small.
       tr.target -= Math.round(tr.target / TAU) * TAU;
       tr.angle = tr.target;
     }
+    if (Math.abs(tr.tiltTarget - tr.tilt) < 0.002) tr.tilt = tr.tiltTarget;
     this._applyTurn();
   }
 

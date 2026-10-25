@@ -374,7 +374,9 @@ const draw = {
   surf: null, // surface the current stroke is following { point, normal } (world space)
   hover: null, // surface under the brush while not painting
   grow: null, // shape being grown { t, start, anchor, normal, k }
-  spin: null, // finger dragging to spin the sculpture
+  spin: null, // finger dragging to spin / tilt the sculpture
+  rot: new THREE.Quaternion(), // extra rotation for the next shape (X / Y / Z buttons, or flick while growing)
+  lastEnd: 0, // when the last stroke / shape finished (so a shake right after painting isn't an undo)
   // Peeking at the sculpture from the audience's side, and where we last told viewers we stand.
   peek: false,
   lastEye: null,
@@ -431,7 +433,7 @@ function enterDraw() {
   if (motion.hasOrientation) motion.recenter();
   setDepthSlider(draw.depth);
   showCoach(motion.hasOrientation
-    ? `Point your phone at the TV and tap <b>⟲</b>.<br/><b>Hold the button</b> &amp; sweep to paint, or pick a <b>🧊 shape</b> below.<br/>Drag the <b>slider →</b> for depth, or <b>drag the scene</b> to spin.<br/><span class="small">Tap <b>?</b> anytime for help</span>`
+    ? `Point your phone at the TV and tap <b>⟲</b>.<br/><b>Hold the button</b> &amp; sweep to paint, or pick a <b>🧊 shape</b> below.<br/>Drag the <b>slider →</b> for depth. <b>Swipe the scene</b> to see any side. <b>Shake</b> to undo.<br/><span class="small">Tap <b>?</b> anytime for help</span>`
     : `Drag the screen to look around.<br/><b>Hold the button</b> (or <b>Space</b>) to paint, or pick a <b>🧊 shape</b> below.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`, 7000);
 }
 
@@ -462,9 +464,13 @@ function helpSteps() {
       ? '<b>Paint:</b> hold the big button and sweep your phone through the air. Let go to stop.'
       : '<b>Paint:</b> hold the big button or the <b>Space</b> bar while you drag.'],
     ['↕️', '<b>Depth:</b> drag the <b>slider</b> on the right. Up = farther away, down = nearer. Your brush dot grows and shrinks to show it. You can move it while you paint.'],
-    ['🧊', '<b>Shapes:</b> pick a shape in the row (cube, cone, ring, star…), <b>hold</b> the big button to grow it and <b>let go</b> to place it. Point at another shape first to stack it right on its surface.'],
+    ['🧊', '<b>Shapes:</b> pick a shape in the row (cube, cone, ring, star…). A faint preview shows where it will go. <b>Hold</b> the big button to grow it and <b>let go</b> to place it. Point at another shape first to stack it right on its surface.'],
+    ['🔁', `<b>Turn a shape:</b> tap <b style="color:#ff6b6b">X</b> (tip), <b style="color:#6bff8f">Y</b> (spin) or <b style="color:#6bb8ff">Z</b> (roll) on the left to turn it 45°, and <b>⟲</b> to reset.${tilt ? ' Or <b>flick your wrist</b> while it grows to turn it 90° that way!' : ''}`],
     ['🧲', '<b>Paint on shapes:</b> point the brush at a shape. A <b>green ring</b> means you\'re on its surface, and the depth is automatic. Paint, and the ink follows the shape. On a flat face it stays in that plane. Tap <b>🧲 Snap</b> to switch this off.'],
-    ['🔄', `<b>See every side:</b> ${tilt ? '<b>drag sideways</b> on the scene, or tap ' : 'tap '}<b>◀ ▶</b> to spin your sculpture, then paint its sides and back.`],
+    ['🔄', tilt
+      ? '<b>See every side:</b> <b>swipe</b> on the scene. Sideways spins your sculpture, up and down shows its top or bottom. <b>Double-tap</b> for the front view. ◀ ▶ also spin it 45°.'
+      : '<b>See every side:</b> <b>Shift</b>- or right-drag on the scene (or <b>Q</b>/<b>E</b> to spin, <b>R</b>/<b>F</b> to tip, <b>0</b> to reset), then paint its sides, top and back.'],
+    ['📳', '<b>Shake to undo:</b> give your phone a good shake to take back the last stroke or shape.'],
     ['👁', '<b>Check it:</b> tap <b>👁</b> to see your sculpture from the audience\'s side. Tap the big button to get back to sculpting.'],
     ['🎨', '<b>Tools:</b> pick a colour (it colours shapes too), <b>●</b> changes brush size, <b>↶</b> undoes the last stroke or shape, <b>🗑</b> clears.'],
   ];
@@ -601,6 +607,7 @@ function endStroke() {
   draw.active = false;
   draw.strokeId = null;
   draw.surf = null;
+  draw.lastEnd = performance.now();
   $('#holdBtn').classList.remove('active');
 }
 
@@ -715,11 +722,13 @@ function setTool(t) {
   endStroke();
   draw.tool = t;
   for (const b of $('#tools').querySelectorAll('button[data-t]')) b.classList.toggle('on', b.dataset.t === t);
+  $('#rotBar').classList.toggle('hidden', t === 'brush');
+  if (t === 'brush') scene.setGhost(null);
   if (!draw.peek) $('#holdBtn').innerHTML = holdLabel();
   hideCoach();
   if (t !== 'brush' && !setTool.tipped) {
     setTool.tipped = true;
-    showCoach('<b>Hold</b> the button to grow your shape, <b>let go</b> to place it.<br/>Point at another shape first to stack it on its surface.', 4500);
+    showCoach('<b>Hold</b> the button to grow your shape, <b>let go</b> to place it.<br/>Turn it with <b>X Y Z</b> on the left, or <b>flick your wrist</b> while it grows.', 5000);
   }
 }
 $('#tools').addEventListener('click', (e) => {
@@ -764,11 +773,12 @@ function shapeSpec(g) {
   const anchor = scene.toSculpture(g.anchor);
   const q = new THREE.Quaternion();
   let center;
+  const ext = shapeExtent(g.t);
   if (g.normal) {
     // Stand it on the surface we pointed at, its base touching the surface.
     const n = g.normal.clone().transformDirection(scene.turnInverse);
     q.setFromUnitVectors(UP, n);
-    center = anchor.clone().addScaledVector(n, shapeGeometry(g.t).halfHeight * g.k);
+    center = anchor.clone().addScaledVector(n, ext.down * g.k);
   } else {
     // Floating: upright, front turned towards you, and growing AWAY from you (its front stays where you aimed).
     const eye = scene.eye();
@@ -776,9 +786,57 @@ function shapeSpec(g) {
     const away = anchor.clone().sub(eye).setY(0);
     if (away.lengthSq() < 1e-6) away.set(0, 0, -1);
     away.normalize();
-    center = anchor.clone().addScaledVector(away, shapeGeometry(g.t).halfDepth * g.k);
+    center = anchor.clone().addScaledVector(away, ext.front * g.k);
   }
-  return { t: g.t, color: draw.color, center, q, k: g.k };
+  q.multiply(draw.rot); // your X / Y / Z rotation, relative to that upright / on-surface pose
+  return { t: g.t, color: draw.color, center, q, k: g.k, preview: !!g.preview };
+}
+
+/** How far a shape (with the current rotation) reaches below its centre and towards you, at size 1. */
+function shapeExtent(t) {
+  const box = shapeGeometry(t).geo.boundingBox;
+  let minY = Infinity, maxZ = -Infinity;
+  const v = new THREE.Vector3();
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    v.set(x, y, z).applyQuaternion(draw.rot);
+    minY = Math.min(minY, v.y);
+    maxZ = Math.max(maxZ, v.z);
+  }
+  return { down: -minY, front: maxZ };
+}
+
+// ---------- Rotating the next shape: X / Y / Z buttons, or flick your wrist while growing ----------
+
+const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+const AXIS_NAMES = { x: 'X (tip)', y: 'Y (spin)', z: 'Z (roll)' };
+
+function rotateShape(axis, sign = 1, step = Math.PI / 4) {
+  draw.rot.premultiply(new THREE.Quaternion().setFromAxisAngle(AXES[axis], sign * step)).normalize();
+}
+
+$('#rotBar').addEventListener('click', (e) => {
+  const ax = e.target.closest('button')?.dataset.ax;
+  if (!ax) return;
+  vibrate(8);
+  hideCoach();
+  if (ax === 'reset') {
+    draw.rot.identity();
+    toast('⟲ Rotation reset');
+  } else {
+    rotateShape(ax);
+    toast(`↻ 45° around ${AXIS_NAMES[ax]}`);
+  }
+});
+
+function toast(text, ms = 1100) {
+  const el = $('#drawToast');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
 function growTick(now) {
@@ -801,6 +859,7 @@ function endShape() {
   const g = draw.grow;
   if (!g) return;
   draw.grow = null;
+  draw.lastEnd = performance.now();
   scene.setGhost(null);
   $('#holdBtn').classList.remove('active', 'growing');
   $('#holdBtn').innerHTML = holdLabel();
@@ -847,6 +906,9 @@ window.addEventListener('keydown', (e) => {
   if (screen !== 'sDraw' || e.repeat || e.target.matches?.('input, textarea')) return;
   if (e.code === 'KeyQ') turnSculpture(-1);
   else if (e.code === 'KeyE') turnSculpture(1);
+  else if (e.code === 'KeyR') { scene.tiltBy(Math.PI / 8); renderTurnBar(); }
+  else if (e.code === 'KeyF') { scene.tiltBy(-Math.PI / 8); renderTurnBar(); }
+  else if (e.code === 'Digit0') { scene.resetView(); renderTurnBar(); }
   else if (e.code === 'KeyV') setPeek(!draw.peek);
 });
 
@@ -881,10 +943,13 @@ function setPeek(on, force = false) {
 
 function renderTurnBar() {
   const step = ((Math.round(scene.turn.target / (Math.PI / 4)) % 8) + 8) % 8;
+  const tilt = scene.turn.tiltTarget;
+  const side = tilt > 1.05 ? 'top' : tilt < -1.05 ? 'bottom' : TURN_NAMES[step];
+  const from = Math.abs(tilt) > 1.05 ? '' : tilt > 0.3 ? ' · from above' : tilt < -0.3 ? ' · from below' : '';
   $('#turnLabel').innerHTML = draw.peek
     ? '<small>peeking · drag to look around</small><b>Audience view</b>'
-    : `<small>you're painting the</small><b>${TURN_NAMES[step]}</b>`;
-  $('#turnBar').classList.toggle('turned', step !== 0 && !draw.peek);
+    : `<small>you're painting the</small><b>${side}${from}</b>`;
+  $('#turnBar').classList.toggle('turned', (step !== 0 || Math.abs(tilt) > 0.3) && !draw.peek);
   $('#peekBtn').classList.toggle('on', draw.peek);
 }
 
@@ -911,6 +976,7 @@ let pinchDist = null;
 let lastTap = 0;
 const orbiting = () => screen === 'sGuess' || (screen === 'sDraw' && draw.peek);
 
+canvas.addEventListener('contextmenu', (e) => screen === 'sDraw' && e.preventDefault());
 canvas.addEventListener('pointerdown', (e) => {
   if (orbiting()) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -921,9 +987,17 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (screen !== 'sDraw') return;
-  if (motion.hasOrientation) {
-    // Drag sideways on the scene to spin your sculpture and see it from every angle.
-    draw.spin = { x: e.clientX };
+  if (motion.hasOrientation || e.shiftKey || e.button === 2) {
+    // Swipe on the scene to see your sculpture from any angle:
+    // sideways spins it, up/down tips it so you see its top or bottom. Double-tap for the front view again.
+    const now = performance.now();
+    if (now - lastTap < 300) {
+      scene.resetView();
+      renderTurnBar();
+      toast('⟲ Front view');
+    }
+    lastTap = now;
+    draw.spin = { x: e.clientX, y: e.clientY };
     canvas.setPointerCapture(e.pointerId);
     return;
   }
@@ -947,10 +1021,13 @@ canvas.addEventListener('pointermove', (e) => {
   }
   if (draw.spin && screen === 'sDraw') {
     const dx = e.clientX - draw.spin.x;
+    const dy = e.clientY - draw.spin.y;
     draw.spin.x = e.clientX;
-    if (Math.abs(dx) > 0) {
+    draw.spin.y = e.clientY;
+    if (dx || dy) {
       hideCoach();
       scene.turnBy(dx * 0.008);
+      scene.tiltBy(dy * 0.008); // drag down = tip the top towards you
       renderTurnBar();
     }
     return;
@@ -1027,6 +1104,11 @@ function frame(now) {
   scene.setSurfaceMarker(surf ? p : null, surf?.normal, draw.color);
   $('#depthMeter').classList.toggle('snapped', !!surf);
   if (draw.grow) growTick(now);
+  else if (draw.tool !== 'brush') {
+    // Show a faint, small preview of the next shape (with its rotation) where it would go.
+    const anchor = draw.hover ? draw.hover.point.clone() : freePoint();
+    scene.setGhost(shapeSpec({ t: draw.tool, anchor, normal: draw.hover?.normal || null, k: Math.min(0.3, anchor.length() * 0.6), preview: true }));
+  }
 
   if (draw.active && draw.strokeId) {
     if (p.distanceTo(draw.last) > 0.008) {
@@ -1074,10 +1156,26 @@ motion.onShake(() => {
     motion._t = setTimeout(() => ($('#shakeStatus').textContent = 'Shake your phone to test 🫨'), 1800);
   } else if (screen === 'sGuess' && !throwing && performance.now() > ignoreShakeUntil) {
     openGuess();
+  } else if (screen === 'sDraw' && !draw.peek && !draw.active && !draw.grow && performance.now() - draw.lastEnd > 700) {
+    // Sculptor: shake to undo (like a real-life "shake to undo"), but never mid-stroke.
+    if (!scene.strokes.size) return;
+    if (practicing) scene.undoLast();
+    else socket.emit('draw:undo');
+    toast('↶ Shaken off! (undo)');
+    vibrate([40, 30, 40]);
+    sfx.wrong();
   }
 });
-motion.onFlick(() => {
-  if (throwing) throwPower();
+motion.onFlick((rate) => {
+  if (throwing) return throwPower();
+  // Sculptor: flick your wrist while growing a shape to turn it 90° around the axis you flicked.
+  if (screen === 'sDraw' && draw.grow && rate) {
+    const a = Math.abs(rate.alpha), b = Math.abs(rate.beta), g = Math.abs(rate.gamma);
+    const [axis, v] = b >= g && b >= a ? ['x', rate.beta] : g >= a ? ['y', rate.gamma] : ['z', rate.alpha];
+    rotateShape(axis, Math.sign(v) || 1, Math.PI / 2);
+    toast(`🌀 Flick! 90° around ${AXIS_NAMES[axis]}`);
+    vibrate([15, 20, 15]);
+  }
 });
 
 // =====================================================================

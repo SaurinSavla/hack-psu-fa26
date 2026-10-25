@@ -773,3 +773,28 @@ body.phone {
 }
 .depth.snapped .knob, .depth.snapped .track { opacity: 0.35; }
 .draw-screen.peeking .tools { opacity: 0.3; pointer-events: none; }
+
+/* ---------- Shape rotation (left side) + quick toasts ---------- */
+.rot-bar {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 4;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 5px;
+  border-radius: 18px; background: rgba(19, 22, 43, 0.85); border: 1px solid var(--line);
+}
+.rot-bar small { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.rot-bar .ax {
+  width: 42px; height: 42px; border-radius: 12px; font-weight: 800; font-size: 0.95rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;
+  background: rgba(255, 255, 255, 0.06); border: 1.5px solid var(--c, var(--line)); color: var(--c, var(--text));
+}
+.rot-bar .ax i { font-style: normal; font-size: 0.7rem; opacity: 0.8; }
+.rot-bar .ax:active { transform: scale(0.9); }
+.rot-bar .ax-x { --c: #ff6b6b; }
+.rot-bar .ax-y { --c: #6bff8f; }
+.rot-bar .ax-z { --c: #6bb8ff; }
+.rot-bar .ax-0 { font-size: 1.1rem; }
+.draw-screen.peeking .rot-bar { opacity: 0.3; pointer-events: none; }
+.toast {
+  position: absolute; z-index: 9; left: 0; right: 0; top: 34%; margin: 0 auto; width: max-content; max-width: 80vw;
+  padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 0.9rem; text-align: center; pointer-events: none;
+  background: rgba(19, 22, 43, 0.92); border: 1.5px solid var(--lime); color: var(--text); animation: pop 0.25s both;
+}
