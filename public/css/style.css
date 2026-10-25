@@ -430,9 +430,22 @@ body.phone {
   display: flex; flex-direction: column; gap: 12px; align-items: center;
   background: linear-gradient(transparent, rgba(11, 13, 26, 0.9) 35%);
 }
-.swatches { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.swatches button { width: 32px; height: 32px; border-radius: 50%; background: var(--c); border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
-.swatches button.on { border-color: #fff; transform: scale(1.12); }
+/* One scrolling row of colours (centred when it fits), with an "any colour" picker first. */
+.swatches {
+  position: relative; display: flex; gap: 8px; width: calc(100% - 76px); max-width: 560px; /* clear of the depth meter */
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 6px 16px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+.swatches::-webkit-scrollbar { display: none; }
+.swatches > :first-child { margin-left: auto; }
+.swatches > :last-child { margin-right: auto; }
+.swatches button, .swatches .custom { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+.swatches button { background: var(--c); }
+.swatches button.on, .swatches .custom.on { border-color: #fff; transform: scale(1.12); }
+.swatches .custom { position: relative; overflow: hidden; background: conic-gradient(#ff2e3a, #ffe53d, #3dffa8, #3de0ff, #5d8bff, #a77bff, #ff7ad9, #ff2e3a); }
+.swatches .custom::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px rgba(11, 13, 26, 0.6); pointer-events: none; }
+.swatches .custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
 .draw-row { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 420px; }
 .holdbtn {
   width: 132px; height: 132px; border-radius: 50%;

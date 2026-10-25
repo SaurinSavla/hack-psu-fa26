@@ -87,6 +87,8 @@ PUBLIC_URL=https://your-tunnel.trycloudflare.com npm start
    - 🛡️ **Shield**: blocks the next attack on you
 6. **Reveal.** The **first correct guess ends the turn**. The word appears and the sculpture is shown from the front.
 
+**Ink colours:** the sculptor's colour row scrolls through 24 inks (including greens, browns, skin tones and greys), and the 🌈 swatch at the start opens a picker for any colour, remembered on that phone.
+
 **Scoring:** the guesser earns `100 + 400 × fraction of time left` points, multiplied by difficulty (easy ×1, medium ×1.25, hard ×1.5). The **sculptor earns half** of that, so drawing clearly pays off. Nobody else scores that turn.
 
 **Word packs** live in `lib/words.js`: 🎨 Classic (120), 🎃 Spooky, 🦁 Penn State & HackPSU, 💻 Tech & Code, 🍕 Food and 🦒 Animals. Each is sorted into easy/medium/hard by how hard it is to sculpt and recognize in 3D. Mix packs in Settings, and paste your own **custom words** (comma or one per line; difficulty is guessed from length). An `ALIASES` map lists synonyms that also count (e.g. *carousel* = *merry go round*).
