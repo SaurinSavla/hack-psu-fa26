@@ -4,7 +4,7 @@
 
 A 3D Pictionary party game for 4–12 players. No app install: phones join from the browser by scanning a QR code.
 
-| Requirement | How Sculpt & Spin uses it |
+| Requirement | How Pictionary 64 uses it |
 |---|---|
 | **Phone motion** | The sculptor's phone *is* the brush: **pointing and sweeping it through the air** paints in 3D, a **wrist flick** turns a shape as it grows, and a **shake** undoes. Guessers **shake** to unlock each guess and **flick** their phone to throw sabotage power-ups. |
 | **Rivalry** | The first correct guess ends the turn, and faster guesses score more. Sabotage rivals with fog, flip, dizzy and freeze power-ups. Live scoreboard, podium, and take-home GIFs of every sculpture. |
@@ -182,7 +182,7 @@ scripts/check-words.js  Checks the word packs for duplicates and typos
 
 ## Credits
 
-Sculpt & Spin was built at HackPSU Fall 2026. It stands on these open-source projects and services:
+Pictionary 64 was built at HackPSU Fall 2026. It stands on these open-source projects and services:
 
 | What | Used for | License |
 |---|---|---|
