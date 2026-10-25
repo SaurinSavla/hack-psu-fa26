@@ -1,4 +1,4 @@
-# 🎨 Sculpt & Spin
+# 🎨 Pictionary 64
 
 **Paint in thin air with your phone. Everyone else races to guess it, while it spins into view.**
 
