@@ -105,12 +105,20 @@ function useRoom(res) {
   return true;
 }
 
+let creating = false;
 async function createRoom() {
+  if (creating || room) return; // a double click or Enter must not open two rooms
+  creating = true;
   unlockAudio();
   closePanels();
+  hideBanner();
   gifUrls.clear();
   gifJobs.clear();
-  useRoom(await socket.emitWithAck('host:create', { settings: serverSettings() }));
+  try {
+    useRoom(await socket.emitWithAck('host:create', { settings: serverSettings() }));
+  } finally {
+    creating = false;
+  }
 }
 
 socket.on('connect', async () => {
@@ -119,7 +127,10 @@ socket.on('connect', async () => {
   const saved = JSON.parse(sessionStorage.getItem('sns-host') || 'null');
   if (saved && (await socket.emitWithAck('host:resume', saved).then(useRoom))) return;
   sessionStorage.removeItem('sns-host');
-  if (!room) goMenu();
+  if (!room) return goMenu();
+  // We were hosting, but the server restarted and forgot the room: don't keep showing a dead code.
+  goMenu();
+  banner('The server restarted, so that room is gone. Press Start game to open a new one.');
 });
 socket.on('disconnect', () => banner('Lost connection to the server — reconnecting…'));
 

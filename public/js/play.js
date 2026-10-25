@@ -56,21 +56,29 @@ $('#room').addEventListener('input', (e) => (e.target.value = e.target.value.toU
 
 async function join(code, name) {
   const saved = JSON.parse(localStorage.getItem('sns-player') || 'null');
-  const playerId = saved && saved.code === code ? saved.playerId : undefined;
-  const res = await socket.emitWithAck('player:join', { code, name, playerId });
+  const mine = saved && saved.code === code;
+  const res = await socket.emitWithAck('player:join', { code, name, playerId: mine ? saved.playerId : undefined, token: mine ? saved.token : undefined });
   if (!res.ok) {
     $('#joinErr').textContent = res.error;
     return false;
   }
   me = { playerId: res.playerId, name: res.name, color: res.color, code: res.code };
   myId = res.playerId;
-  localStorage.setItem('sns-player', JSON.stringify({ code: res.code, playerId: res.playerId }));
+  localStorage.setItem('sns-player', JSON.stringify({ code: res.code, playerId: res.playerId, token: res.token }));
   history.replaceState(null, '', `/?room=${res.code}`);
   return true;
 }
 
-socket.on('connect', () => {
-  if (me) join(me.code, me.name);
+socket.on('connect', async () => {
+  if (!me) return;
+  // If the server restarted, the room is gone: go back to the join screen instead of sitting on a dead game.
+  if (!(await join(me.code, me.name))) {
+    me = null;
+    state = null;
+    clearEffects();
+    $('#pausedOverlay').classList.add('hidden');
+    show('sJoin');
+  }
 });
 socket.on('disconnect', (reason) => console.warn('[sns] disconnected:', reason));
 
@@ -402,6 +410,7 @@ function startStroke() {
   if (screen !== 'sDraw' || draw.active) return;
   if (!practicing && performance.now() < countdownUntil) return; // wait for "SCULPT!"
   if (!practicing && !(state && state.phase === 'draw' && isDrawer())) return;
+  if (!practicing && sculptureFull()) return;
   draw.active = true;
   draw.strokeId = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
   const p = currentPoint();
@@ -433,6 +442,37 @@ function flushPoints(force) {
   socket.emit('draw:points', { id: draw.strokeId, pts: draw.pending });
   draw.pending = [];
   draw.lastSend = now;
+  if (force) return;
+  if (sculptureFull()) return endStroke();
+  const s = scene.strokes.get(draw.strokeId);
+  if (s && s.points.length >= STROKE_SPLIT) continueStroke(s);
+}
+
+// Mirror the server's caps (lib/game.js) so long sweeps and big sculptures never silently stop syncing.
+const STROKE_SPLIT = 1400; // points per stroke (server max 1500)
+const MAX_INK = 19800; // points per sculpture (server max 20000)
+const MAX_STROKES = 400;
+
+/** Carry a long sweep on in a fresh stroke, starting where the old one ended. */
+function continueStroke(s) {
+  const last = s.points[s.points.length - 1];
+  const pts = [round(last.x), round(last.y), round(last.z)];
+  draw.strokeId = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
+  scene.addStroke({ id: draw.strokeId, color: s.color, width: s.width, pts });
+  socket.emit('draw:start', { id: draw.strokeId, color: s.color, width: s.width, p: pts });
+}
+
+function sculptureFull() {
+  const full = scene.strokes.size >= MAX_STROKES || scene.inkCount() >= MAX_INK;
+  if (full) {
+    const coach = $('#coach');
+    coach.innerHTML = '<b>Your sculpture is full!</b><br/>Undo or clear some strokes to keep sculpting.';
+    coach.style.opacity = '1';
+    coach.classList.remove('hidden');
+    clearTimeout(enterDraw.t);
+    enterDraw.t = setTimeout(() => (coach.style.opacity = '0'), 3500);
+  }
+  return full;
 }
 
 const round = (v) => Math.round(v * 1000) / 1000;

@@ -78,12 +78,13 @@ async function sculpt(sock, turnKey, bot) {
 }
 
 for (let n = 0; n < count; n++) {
-  const bot = { name: NAMES[n % NAMES.length], id: null, turnKey: null, powers: [], state: null };
+  const bot = { name: NAMES[n % NAMES.length], id: null, token: null, turnKey: null, powers: [], state: null };
   const sock = io(URL, { transports: ['websocket'] });
   sock.on('connect', async () => {
-    const res = await sock.emitWithAck('player:join', { code, name: bot.name, playerId: bot.id });
+    const res = await sock.emitWithAck('player:join', { code, name: bot.name, playerId: bot.id, token: bot.token });
     if (!res.ok) return console.log(`${bot.name}: ${res.error}`);
     bot.id = res.playerId;
+    bot.token = res.token;
     console.log(`🤖 ${res.name} joined ${code}`);
   });
   sock.on('private', (p) => (bot.powers = p.powers || []));

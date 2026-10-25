@@ -120,7 +120,7 @@ async function main() {
     const cutoff = Date.now() - 45 * 60 * 1000;
     for (const [code, room] of rooms) {
       if (!room.hostSocketId && room.connectedPlayers().length === 0 && room.lastActive < cutoff) {
-        clearTimeout(room.timer);
+        room.dispose();
         rooms.delete(code);
       }
     }
@@ -224,8 +224,7 @@ async function main() {
 
     socket.on('host:close', () => {
       if (!room || !isHost) return;
-      clearTimeout(room.timer);
-      (room.hintTimers || []).forEach(clearTimeout);
+      room.dispose();
       io.to(room.channel).emit('room:closed');
       io.in(room.channel).socketsLeave(room.channel);
       rooms.delete(room.code);
@@ -242,15 +241,15 @@ async function main() {
       r.broadcast();
     });
 
-    socket.on('player:join', ({ code, name, playerId: pid } = {}, cb) => {
+    socket.on('player:join', ({ code, name, playerId: pid, token } = {}, cb) => {
       const r = rooms.get(String(code || '').trim().toUpperCase());
       if (!r) return ack(cb)({ ok: false, error: 'No game with that code. Check the TV screen.' });
-      const res = r.addPlayer(socket, { name, playerId: pid });
+      const res = r.addPlayer(socket, { name, playerId: pid, token });
       if (res.error) return ack(cb)({ ok: false, error: res.error });
       room = r;
       playerId = res.player.id;
       socket.join(r.channel);
-      ack(cb)({ ok: true, playerId, name: res.player.name, color: res.player.color, code: r.code });
+      ack(cb)({ ok: true, playerId, token: res.player.token, name: res.player.name, color: res.player.color, code: r.code });
       socket.emit('stroke:sync', r.strokes);
       if (r.phase === 'podium') socket.emit('gallery', r.galleryPayload());
       if (!res.rejoined) r.feed({ type: 'join', playerId, text: `${res.player.name} joined` });
@@ -311,8 +310,9 @@ async function main() {
     });
     socket.on('draw:cursor', (data = {}) => {
       if (!room || !playerId || !room.canDraw(playerId)) return;
-      const p = Array.isArray(data.p) && data.p.length === 3 && data.p.every(Number.isFinite) ? data.p : null;
-      if (p) socket.to(room.channel).emit('cursor', { p, drawing: !!data.drawing, color: String(data.color || '').slice(0, 7) });
+      const p = Array.isArray(data.p) && data.p.length === 3 && data.p.every((v) => Number.isFinite(v) && Math.abs(v) <= 10) ? data.p : null;
+      const color = /^#[0-9a-f]{6}$/i.test(data.color) ? data.color : '#ffffff';
+      if (p) socket.to(room.channel).emit('cursor', { p, drawing: !!data.drawing, color });
     });
 
     socket.on('guess', ({ text } = {}, cb) => {
