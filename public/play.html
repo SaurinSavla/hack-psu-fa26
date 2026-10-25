@@ -84,7 +84,12 @@
         <button class="icon-btn" id="recenterBtn" title="Recenter">⟲</button>
       </div>
     </div>
-    <div class="depth" id="depthMeter"><span>far</span><div class="knob" id="depthKnob"></div><span>near</span></div>
+    <div class="depth" id="depthMeter" role="slider" aria-label="Brush distance: drag up for farther, down for nearer" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+      <span>far</span>
+      <div class="track"><div class="fill" id="depthFill"></div></div>
+      <div class="knob" id="depthKnob"><b id="depthVal"></b></div>
+      <span>near</span>
+    </div>
     <div class="turn-bar" id="turnBar">
       <button class="icon-btn sm" id="turnLeft" title="Spin the sculpture (Q)" aria-label="Spin the sculpture left">◀</button>
       <span class="turn-label" id="turnLabel"></span>
@@ -92,6 +97,11 @@
       <button class="icon-btn sm" id="peekBtn" title="Peek from the audience's side (V)" aria-label="Peek at the sculpture from the audience's side">👁</button>
     </div>
     <div class="coach" id="coach"></div>
+    <div class="help-card hidden" id="helpCard" role="dialog" aria-label="How to sculpt">
+      <div class="help-head"><b>How to sculpt ✨</b><button class="icon-btn sm" id="helpClose" aria-label="Close">✕</button></div>
+      <ol class="help-steps" id="helpSteps"></ol>
+      <button class="btn wide" id="helpGotIt">Got it, let's sculpt!</button>
+    </div>
     <div class="draw-bottom">
       <div class="swatches" id="swatches"></div>
       <div class="draw-row">
@@ -102,7 +112,7 @@
         <button class="holdbtn" id="holdBtn">Hold to<br />sculpt</button>
         <div class="side-tools">
           <button class="icon-btn" id="sizeBtn" title="Brush size">●</button>
-          <button class="icon-btn" id="lockBtn" title="Depth lock">🔓</button>
+          <button class="icon-btn help-btn" id="helpBtn" title="How to sculpt" aria-label="How to sculpt">?</button>
         </div>
       </div>
       <button class="btn ghost hidden" id="practiceDone">Done practicing</button>

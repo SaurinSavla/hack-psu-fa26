@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { Sculpture } from './scene.js';
-import { MotionInput, requestMotionPermission, twistOf } from './motion.js';
+import { MotionInput, requestMotionPermission } from './motion.js';
 import { $, esc, avatar, renderMask, pips, PhaseClock, setTimer } from './common.js';
 import { sfx, unlockAudio } from './sfx.js';
 
@@ -361,7 +361,6 @@ const draw = {
   color: null,
   sizeIdx: 1,
   depth: 1,
-  locked: false,
   counter: 0,
   lastSend: 0,
   lastCursor: 0,
@@ -422,15 +421,131 @@ function enterDraw() {
   $('#practiceDone').classList.toggle('hidden', !practicing);
   $('#drawTimer').classList.toggle('hidden', practicing);
   if (motion.hasOrientation) motion.recenter();
-  const coach = $('#coach');
-  coach.innerHTML = motion.hasOrientation
-    ? `Hold your phone up like a camera and <b>point at the TV</b>, then tap <b>⟲</b>.<br/><br/><b>Hold the button</b> &amp; sweep to paint. <b>Twist</b> your wrist to push ink farther away.<br/><br/><b>◀ ▶</b> spin your sculpture to paint its sides and back. <b>👁</b> peeks at it from the audience's side.`
-    : `<b>No motion sensors detected.</b><br/>Drag the screen to look around. Hold the button (or <b>Space</b>) to sculpt. Scroll to change depth.<br/><br/><b>◀ ▶</b> (or <b>Q</b>/<b>E</b>) spin your sculpture. <b>👁</b> (or <b>V</b>) peeks at it from the audience's side.`;
-  coach.style.opacity = '1';
-  coach.classList.remove('hidden');
-  clearTimeout(enterDraw.t);
-  enterDraw.t = setTimeout(() => (coach.style.opacity = '0'), 6500);
+  setDepthSlider(draw.depth);
+  showCoach(motion.hasOrientation
+    ? `Point your phone at the TV and tap <b>⟲</b>.<br/><b>Hold the button</b> &amp; sweep to paint.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`
+    : `Drag the screen to look around.<br/><b>Hold the button</b> (or <b>Space</b>) to paint.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`, 7000);
 }
+
+// ---------- Coach tip (auto-hides as soon as you start sculpting) ----------
+
+function showCoach(html, ms = 6000) {
+  const el = $('#coach');
+  el.innerHTML = html;
+  el.classList.remove('hidden', 'gone');
+  el.style.opacity = '1';
+  clearTimeout(showCoach.t);
+  showCoach.t = setTimeout(hideCoach, ms);
+}
+function hideCoach() {
+  clearTimeout(showCoach.t);
+  $('#coach').classList.add('gone');
+}
+
+// ---------- "?" help card ----------
+
+function helpSteps() {
+  const tilt = motion.hasOrientation;
+  const steps = [
+    ['📱', tilt
+      ? '<b>Aim:</b> hold your phone up like a camera, point it at the TV and tap <b>⟲</b> to centre.'
+      : '<b>Aim:</b> drag the screen to look around (no motion sensors on this device).'],
+    ['🖌️', tilt
+      ? '<b>Paint:</b> hold the big button and sweep your phone through the air. Let go to stop.'
+      : '<b>Paint:</b> hold the big button or the <b>Space</b> bar while you drag.'],
+    ['↕️', '<b>Depth:</b> drag the <b>slider</b> on the right. Up = farther away, down = nearer. Your brush dot grows and shrinks to show it. You can move it while you paint.'],
+    ['🔄', '<b>Sides:</b> tap <b>◀ ▶</b> to spin your sculpture, then paint its sides and back. Use the slider to set how deep each new stroke goes.'],
+    ['👁', '<b>Check it:</b> tap <b>👁</b> to see your sculpture from the audience\'s side. Tap the big button to get back to sculpting.'],
+    ['🎨', '<b>Tools:</b> pick a colour below, <b>●</b> changes brush size, <b>↶</b> undoes, <b>🗑</b> clears.'],
+  ];
+  return steps.map(([ico, html]) => `<li><span class="ico">${ico}</span><span>${html}</span></li>`).join('');
+}
+function openHelp() {
+  endStroke();
+  hideCoach();
+  $('#helpSteps').innerHTML = helpSteps();
+  $('#helpCard').classList.remove('hidden');
+}
+function closeHelp() {
+  $('#helpCard').classList.add('hidden');
+}
+$('#helpBtn').addEventListener('click', () => ($('#helpCard').classList.contains('hidden') ? openHelp() : closeHelp()));
+$('#helpClose').addEventListener('click', closeHelp);
+$('#helpGotIt').addEventListener('click', closeHelp);
+
+// ---------- Depth slider: drag up for farther, down for nearer ----------
+
+const DEPTH_RANGE = 0.9; // depth = 2^(v * range), v in [-1, 1] → about 0.54 … 1.87
+const depthFromV = (v) => Math.pow(2, Math.max(-1, Math.min(1, v)) * DEPTH_RANGE);
+const vFromDepth = (d) => Math.max(-1, Math.min(1, Math.log2(d) / DEPTH_RANGE));
+
+function setDepthSlider(depth) {
+  draw.depth = depth;
+  const v = vFromDepth(depth);
+  const frac = (v + 1) / 2; // 0 = near (bottom), 1 = far (top)
+  const meter = $('#depthMeter');
+  const h = meter.clientHeight || 300;
+  const pad = 24;
+  const y = pad + (1 - frac) * (h - pad * 2);
+  $('#depthKnob').style.top = `${y - 18}px`;
+  $('#depthFill').style.height = `${frac * 100}%`;
+  const pct = Math.round(frac * 100);
+  $('#depthVal').textContent = pct;
+  meter.setAttribute('aria-valuenow', pct);
+}
+
+function depthFromPointer(e) {
+  const r = $('#depthMeter').getBoundingClientRect();
+  const pad = 24;
+  const frac = 1 - (e.clientY - r.top - pad) / Math.max(1, r.height - pad * 2);
+  return depthFromV(frac * 2 - 1);
+}
+
+let depthFlashEl = null;
+function flashDepth() {
+  const meter = $('#depthMeter');
+  if (!depthFlashEl) {
+    depthFlashEl = document.createElement('div');
+    depthFlashEl.className = 'depth-flash';
+    meter.parentElement.appendChild(depthFlashEl);
+  }
+  const v = vFromDepth(draw.depth);
+  depthFlashEl.textContent = v > 0.33 ? '↑ Far' : v < -0.33 ? '↓ Near' : '• Middle';
+  const kr = $('#depthKnob').getBoundingClientRect();
+  const pr = meter.parentElement.getBoundingClientRect();
+  depthFlashEl.style.top = `${kr.top + kr.height / 2 - pr.top}px`;
+  depthFlashEl.style.display = 'block';
+  clearTimeout(flashDepth.t);
+  flashDepth.t = setTimeout(() => (depthFlashEl.style.display = 'none'), 900);
+}
+
+const depthMeter = $('#depthMeter');
+depthMeter.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  depthMeter.setPointerCapture(e.pointerId);
+  depthMeter.classList.add('dragging');
+  hideCoach();
+  setDepthSlider(depthFromPointer(e));
+  flashDepth();
+  vibrate(8);
+});
+depthMeter.addEventListener('pointermove', (e) => {
+  if (!depthMeter.hasPointerCapture(e.pointerId)) return;
+  setDepthSlider(depthFromPointer(e));
+  flashDepth();
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) =>
+  depthMeter.addEventListener(ev, () => depthMeter.classList.remove('dragging')));
+depthMeter.addEventListener('keydown', (e) => {
+  const v = vFromDepth(draw.depth);
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setDepthSlider(depthFromV(v + 0.1));
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setDepthSlider(depthFromV(v - 0.1));
+  else return;
+  e.preventDefault();
+  flashDepth();
+});
+addEventListener('resize', () => setDepthSlider(draw.depth));
 
 function startPractice() {
   practicing = true;
@@ -453,6 +568,8 @@ function startStroke() {
   if (!practicing && performance.now() < countdownUntil) return; // wait for "SCULPT!"
   if (!practicing && !(state && state.phase === 'draw' && isDrawer())) return;
   if (!practicing && sculptureFull()) return;
+  hideCoach(); // get the tip out of the way as soon as you start painting
+  closeHelp();
   draw.active = true;
   draw.strokeId = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
   const p = currentPoint();
@@ -508,12 +625,7 @@ function continueStroke(s) {
 function sculptureFull() {
   const full = scene.strokes.size >= MAX_STROKES || scene.inkCount() >= MAX_INK;
   if (full) {
-    const coach = $('#coach');
-    coach.innerHTML = '<b>Your sculpture is full!</b><br/>Undo or clear some strokes to keep sculpting.';
-    coach.style.opacity = '1';
-    coach.classList.remove('hidden');
-    clearTimeout(enterDraw.t);
-    enterDraw.t = setTimeout(() => (coach.style.opacity = '0'), 3500);
+    showCoach('<b>Your sculpture is full!</b><br/>Undo or clear some strokes to keep sculpting.', 3500);
   }
   return full;
 }
@@ -564,6 +676,7 @@ const TURN_NAMES = ['front', 'front-left', 'left side', 'back-left', 'back', 'ba
 
 /** Spin the sculpture an eighth of a turn (dir = -1 or 1) so a different side faces you. */
 function turnSculpture(dir) {
+  hideCoach();
   setPeek(false);
   scene.turnBy((dir * Math.PI) / 4);
   renderTurnBar();
@@ -662,8 +775,9 @@ canvas.addEventListener('wheel', (e) => {
     updateViewUi();
     return;
   }
-  if (screen !== 'sDraw' || draw.locked) return;
-  draw.depth = Math.min(1.8, Math.max(0.5, draw.depth * (e.deltaY > 0 ? 1.06 : 0.94)));
+  if (screen !== 'sDraw') return;
+  setDepthSlider(depthFromV(vFromDepth(draw.depth) + (e.deltaY > 0 ? -0.08 : 0.08)));
+  flashDepth();
 }, { passive: true });
 
 function resetView() {
@@ -695,12 +809,6 @@ $('#sizeBtn').addEventListener('click', () => {
   draw.sizeIdx = (draw.sizeIdx + 1) % SIZES.length;
   $('#sizeBtn').textContent = SIZES[draw.sizeIdx].label;
 });
-$('#lockBtn').addEventListener('click', () => {
-  draw.locked = !draw.locked;
-  if (draw.locked) draw.depth = 1;
-  $('#lockBtn').textContent = draw.locked ? '🔒' : '🔓';
-  $('#depthMeter').classList.toggle('locked', draw.locked);
-});
 
 // Main per-frame loop for the drawer.
 let lastFrame = performance.now();
@@ -714,20 +822,6 @@ function frame(now) {
 
   const q = currentQuaternion(dt);
   scene.setDrawerQuaternion(q);
-
-  // Wrist twist → depth (with a dead zone so normal holding doesn't wobble).
-  if (motion.hasOrientation && !draw.locked) {
-    const tw = twistOf(q);
-    if (tw !== null) {
-      const deg = (tw * 180) / Math.PI;
-      const dead = 12;
-      const v = Math.sign(deg) * Math.min(1, Math.max(0, Math.abs(deg) - dead) / 45);
-      const target = Math.pow(2, v * 0.9); // ≈0.54 … 1.87
-      draw.depth += (target - draw.depth) * (1 - Math.exp(-dt * 10));
-    }
-  }
-  const knobPct = 1 - (Math.log2(draw.depth) / 0.9 + 1) / 2;
-  $('#depthKnob').style.top = `calc(${Math.max(0.06, Math.min(0.94, knobPct)) * 100}% - 11px)`;
 
   const p = currentPoint();
   scene.setReticle(p, draw.color, draw.active);
@@ -1176,4 +1270,4 @@ socket.on('room:closed', () => {
 });
 
 // Debug handle for the browser console.
-window.__sns = { motion, get state() { return state; }, get priv() { return priv; }, get screen() { return screen; } };
+window.__sns = { motion, get state() { return state; }, get priv() { return priv; }, get screen() { return screen; }, scene, get depth() { return draw.depth; } };

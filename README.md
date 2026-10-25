@@ -6,7 +6,7 @@ A 3D Pictionary party game for 4–12 players. No app install: phones join from 
 
 | Requirement | How Sculpt & Spin uses it |
 |---|---|
-| **Phone motion** | The drawer's phone *is* the brush. Sweeping it paints in 3D, twisting the wrist pushes ink nearer or farther. Guessers **shake** to unlock each guess and **flick** their phone to throw sabotage power-ups. |
+| **Phone motion** | The drawer's phone *is* the brush. Sweeping it paints in 3D, the depth slider sets how near or far it paints. Guessers **shake** to unlock each guess and **flick** their phone to throw sabotage power-ups. |
 | **Rivalry** | The first correct guess ends the turn, and faster guesses score more. Sabotage rivals with fog, flip, dizzy and freeze power-ups. Live scoreboard, podium, and take-home GIFs of every sculpture. |
 | **Group play** | Built for 4+ people (works from 2, up to 12). Everyone takes a turn sculpting each round. |
 
@@ -96,7 +96,7 @@ PUBLIC_URL=https://your-tunnel.trycloudflare.com npm start
 ## How a turn works
 
 1. **Choose (15s).** The sculptor picks one of three words: easy (×1), medium (×1.25) or hard (×1.5 points).
-2. **Sculpt (30, 60, 90 or 180s).** After a **3-2-1 SCULPT!** countdown on the TV and the sculptor's phone, the sculptor holds their phone like a camera and sees a "magic window" into the 3D space around them. They hold the big button and sweep to paint, and twist the wrist to push the brush farther away (🔓 locks the depth if twisting feels fiddly). To build a real 3D object, **◀ ▶ spin the sculpture on a turntable** (45° at a time) so its sides and back face you, and paint them too; the label shows which side you're painting. **👁 Peek** steps outside to see the sculpture from the audience's side (drag to orbit, pinch to zoom; tap the big button to get back to sculpting). Everyone else sees the sculptor's orb move around the sculpture as they spin it.
+2. **Sculpt (30, 60, 90 or 180s).** After a **3-2-1 SCULPT!** countdown on the TV and the sculptor's phone, the sculptor holds their phone like a camera and sees a "magic window" into the 3D space around them. They hold the big button and sweep to paint, and drag the depth slider (up = farther, down = nearer) to set how far away the brush paints; the brush dot grows and shrinks to show the depth, and a **?** button explains the controls at any time. To build a real 3D object, **◀ ▶ spin the sculpture on a turntable** (45° at a time) so its sides and back face you, and paint them too; the label shows which side you're painting. **👁 Peek** steps outside to see the sculpture from the audience's side (drag to orbit, pinch to zoom; tap the big button to get back to sculpting). Everyone else sees the sculptor's orb move around the sculpture as they spin it.
 3. **Spin.** The TV shows the sculpture from a deliberately bad angle (edge-on, from above) that slowly swings round to the front. On their own phones, guessers can **drag to orbit** the sculpture and **pinch to zoom**; double-tap returns to the auto-spin. Letter hints appear at 50% and 75% of the time.
 4. **Shake to guess.** Shake your phone to unlock the guess box. A wrong guess freezes you for 4s, then you have to shake again.
 5. **Power-ups.** Everyone starts with one; you get another for guessing right, and two **power orbs** drop during each turn (first to tap *Grab* keeps it). Up to 3 slots. Pick a rival and **flick your phone** to throw:
@@ -129,7 +129,7 @@ lib/ai.js        Gemini (guess + critic) and ElevenLabs (cached text-to-speech) 
 lib/env.js       Tiny .env loader
 lib/words.js     Word packs tuned for 3D, sorted by difficulty, custom words, recently-played memory
 public/js/
-  motion.js      DeviceOrientation → quaternion, recentering, wrist-twist depth, shake + flick detection
+  motion.js      DeviceOrientation → quaternion, recentering, shake + flick detection
   scene.js       Three.js renderer: glowing tube strokes, reveal-orbit camera, drawer "magic window"
   play.js        Phone controller (join, sculpt, orbit, shake-to-guess, power-ups, practice mode, take-home GIFs)
   host.js        TV screen (title menu, settings, lobby/QR, live sculpture, scoreboard, power toasts, podium)
@@ -140,7 +140,7 @@ scripts/bots.js  Bot players for solo testing
 scripts/check-words.js  Checks the word packs for duplicates and typos
 ```
 
-**Why orientation, not position?** A phone's accelerometer can't track position: integrating acceleration twice drifts tens of centimetres within a second. The gyroscope's **rotation** is accurate and stable, though. So the brush is projected along the direction the phone points (like a laser pointer onto a sphere around you), and the **wrist twist** around that axis sets the distance. That gives real, drift-free 3D strokes in any phone browser, with no AR framework required.
+**Why orientation, not position?** A phone's accelerometer can't track position: integrating acceleration twice drifts tens of centimetres within a second. The gyroscope's **rotation** is accurate and stable, though. So the brush is projected along the direction the phone points (like a laser pointer onto a sphere around you), and a **depth slider** on screen sets the distance. That gives real, drift-free 3D strokes in any phone browser, with no AR framework required.
 
 **Networking:** the drawer streams points in batches about every 50 ms. The server validates them (only the current drawer can draw, coordinates are bounded, and there are caps on stroke count and size) and relays them to the room. Phase deadlines are sent as "time remaining" rather than timestamps, so devices with different clocks stay in sync. If a phone drops briefly, it rejoins with the same identity, and the sculptor gets an 8-second grace period before their turn is skipped.
 

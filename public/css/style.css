@@ -415,14 +415,44 @@ body.phone {
 .draw-screen .timer, .guess-screen .timer { font-size: 0.72rem; }
 
 .depth {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 3;
-  width: 34px; height: 46%; border-radius: 999px;
-  background: rgba(19, 22, 43, 0.7); border: 1px solid var(--line);
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 52px; height: 46%; border-radius: 999px;
+  background: rgba(19, 22, 43, 0.82); border: 1px solid var(--line);
   display: flex; flex-direction: column; justify-content: space-between; align-items: center;
   padding: 8px 0; font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+  touch-action: none; cursor: ns-resize; user-select: none;
 }
-.depth .knob { position: absolute; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: var(--text); box-shadow: 0 0 12px rgba(255, 255, 255, 0.6); transition: top 0.05s linear; }
-.depth.locked { opacity: 0.45; }
+.depth .track { position: absolute; left: 50%; top: 24px; bottom: 24px; width: 6px; margin-left: -3px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; pointer-events: none; }
+.depth .fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(var(--cyan), var(--lime)); opacity: 0.7; }
+.depth .knob {
+  position: absolute; left: 50%; width: 36px; height: 36px; margin-left: -18px; border-radius: 50%;
+  background: var(--text); color: var(--ink); display: grid; place-items: center;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12), 0 0 14px rgba(255, 255, 255, 0.55); pointer-events: none;
+}
+.depth .knob b { font-size: 0.62rem; font-weight: 800; letter-spacing: 0; text-transform: none; }
+.depth.dragging { border-color: var(--lime); box-shadow: 0 0 22px -4px var(--lime); }
+.depth.dragging .knob { transform: scale(1.15); }
+.depth-flash {
+  position: absolute; right: 68px; z-index: 4; padding: 4px 10px; border-radius: 999px;
+  background: rgba(19, 22, 43, 0.9); border: 1px solid var(--lime); color: var(--lime);
+  font-size: 0.75rem; font-weight: 800; pointer-events: none; transform: translateY(-50%); white-space: nowrap;
+}
+.help-btn { font-weight: 800; font-size: 1.3rem; color: var(--lime); }
+.help-card {
+  position: absolute; z-index: 8; left: 12px; right: 12px;
+  top: calc(max(12px, env(safe-area-inset-top)) + 64px); bottom: max(16px, env(safe-area-inset-bottom));
+  margin: 0 auto; max-width: 380px; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column;
+  background: var(--ink-2); border: 1px solid var(--line); border-radius: 22px; padding: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); animation: rise 0.2s both;
+}
+.help-card .help-steps { flex: 1; }
+.help-card #helpGotIt { flex: none; position: sticky; bottom: 0; }
+.help-head { display: flex; justify-content: space-between; align-items: center; font-size: 1.15rem; margin-bottom: 8px; }
+.help-steps { margin: 0 0 14px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; counter-reset: s; }
+.help-steps li { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; font-size: 0.92rem; color: var(--muted); line-height: 1.35; }
+.help-steps li .ico { width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, 0.07); display: grid; place-items: center; font-size: 1.05rem; }
+.help-steps li b { color: var(--text); }
 
 /* Turntable: spin the sculpture to paint its sides and back, or peek at it from the audience's side. */
 .turn-bar {
@@ -473,11 +503,13 @@ body.phone {
 .side-tools { display: flex; flex-direction: column; gap: 10px; }
 .coach {
   position: absolute; left: 0; right: 0; top: 24%; margin: 0 auto; z-index: 3;
+  max-width: calc(100vw - 90px);
   width: min(80vw, 320px); text-align: center; pointer-events: none;
   background: rgba(19, 22, 43, 0.88); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px;
-  font-size: 0.95rem; color: var(--muted); animation: rise 0.4s both; transition: opacity 0.5s;
+  font-size: 0.95rem; color: var(--muted); animation: rise 0.4s both; transition: opacity 0.35s;
 }
 .coach b { color: var(--text); }
+.coach.gone { opacity: 0 !important; visibility: hidden; transition: opacity 0.25s, visibility 0s 0.25s; }
 
 /* Guesser screen */
 .guess-screen { padding: 0; }
