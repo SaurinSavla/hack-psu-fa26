@@ -145,3 +145,22 @@ scripts/bots.js  Bot players for solo testing
 - Put the host screen on a projector and have a judge sculpt something. The edge-on → front reveal is the "aha" moment.
 - Team mode (2v2 relay sculpting), "everyone sculpts the same word" voting rounds, or exporting sculptures as `.glb` for 3D printing.
 - Use WebXR on Android for true 6-DoF sculpting as an optional "pro brush".
+
+## Credits
+
+Sculpt & Spin was built at HackPSU Fall 2026. It stands on these open-source projects and services:
+
+| What | Used for | License |
+|---|---|---|
+| [three.js](https://github.com/mrdoob/three.js) | 3D rendering of the sculptures, cameras and turntable | MIT |
+| [Socket.IO](https://github.com/socketio/socket.io) (server and client) | Real-time game state and stroke streaming between phones and the TV | MIT |
+| [Express](https://github.com/expressjs/express) | Web server for the TV and phone pages | MIT |
+| [gifenc](https://github.com/mattdesl/gifenc) | Encoding the take-home spinning GIFs | MIT |
+| [node-qrcode](https://github.com/soldair/node-qrcode) | Join and gallery QR codes | MIT |
+| [selfsigned](https://github.com/jfromaniello/selfsigned) | Local HTTPS certificate (phones only allow motion sensors over HTTPS) | MIT |
+| [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) via Google Fonts | Typography | SIL Open Font License |
+| [Google Gemini API](https://ai.google.dev/gemini-api/docs) | The AI rival's guesses and the art-critic reviews | Google API terms |
+| [ElevenLabs API](https://elevenlabs.io/docs) | The game-show announcer voice | ElevenLabs terms |
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (optional) | Public HTTPS link when venue Wi-Fi blocks phones | Cloudflare terms |
+
+References we read along the way: [MDN DeviceOrientationEvent](https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent), [MDN DeviceMotionEvent](https://developer.mozilla.org/en-US/docs/Web/API/DeviceMotionEvent), the [three.js docs](https://threejs.org/docs/) and the [Socket.IO docs](https://socket.io/docs/v4/).
