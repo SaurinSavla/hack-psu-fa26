@@ -250,6 +250,7 @@ async function main() {
       playerId = res.player.id;
       socket.join(r.channel);
       ack(cb)({ ok: true, playerId, token: res.player.token, name: res.player.name, color: res.player.color, code: r.code });
+      socket.emit('state', r.snapshot()); // a freshly loaded phone ignores strokes until it knows the phase
       socket.emit('stroke:sync', r.strokes);
       if (r.phase === 'podium') socket.emit('gallery', r.galleryPayload());
       if (!res.rejoined) r.feed({ type: 'join', playerId, text: `${res.player.name} joined` });
