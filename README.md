@@ -58,7 +58,7 @@ Open the host screen and press **Start game**, then add bots:
 npm run bots -- ABCD 3      # room code shown on screen, number of bots
 ```
 
-Bots join, pick words, sculpt random 3D shapes, spam wrong guesses, grab power orbs and sabotage each other. Open `http://localhost:3000/?room=ABCD` in a desktop browser tab to play alongside them. Without motion sensors, the phone page switches to fallback controls: drag to look around, hold **Space** to sculpt, scroll to change depth.
+Bots join, pick words, sculpt random 3D shapes, spam wrong guesses, grab power orbs and sabotage each other. Open `http://localhost:3000/?room=ABCD` in a desktop browser tab to play alongside them. Without motion sensors, the phone page switches to fallback controls: drag to look around, hold **Space** to sculpt, scroll to change depth, **Q**/**E** to spin the sculpture and **V** to peek.
 
 ### No shared Wi-Fi, or venue Wi-Fi blocks device-to-device traffic?
 
@@ -75,7 +75,7 @@ PUBLIC_URL=https://your-tunnel.trycloudflare.com npm start
 ## How a turn works
 
 1. **Choose (15s).** The sculptor picks one of three words: easy (×1), medium (×1.25) or hard (×1.5 points).
-2. **Sculpt (30, 60, 90 or 180s).** After a **3-2-1 SCULPT!** countdown on the TV and the sculptor's phone, the sculptor holds their phone like a camera and sees a "magic window" into the 3D space around them. They hold the big button and sweep to paint, and twist the wrist to push the brush farther away (🔓 locks the depth if twisting feels fiddly).
+2. **Sculpt (30, 60, 90 or 180s).** After a **3-2-1 SCULPT!** countdown on the TV and the sculptor's phone, the sculptor holds their phone like a camera and sees a "magic window" into the 3D space around them. They hold the big button and sweep to paint, and twist the wrist to push the brush farther away (🔓 locks the depth if twisting feels fiddly). To build a real 3D object, **◀ ▶ spin the sculpture on a turntable** (45° at a time) so its sides and back face you, and paint them too; the label shows which side you're painting. **👁 Peek** steps outside to see the sculpture from the audience's side (drag to orbit, pinch to zoom; tap the big button to get back to sculpting). Everyone else sees the sculptor's orb move around the sculpture as they spin it.
 3. **Spin.** The TV shows the sculpture from a deliberately bad angle (edge-on, from above) that slowly swings round to the front. On their own phones, guessers can **drag to orbit** the sculpture and **pinch to zoom**; double-tap returns to the auto-spin. Letter hints appear at 50% and 75% of the time.
 4. **Shake to guess.** Shake your phone to unlock the guess box. A wrong guess freezes you for 4s, then you have to shake again.
 5. **Power-ups.** Everyone starts with one; you get another for guessing right, and two **power orbs** drop during each turn (first to tap *Grab* keeps it). Up to 3 slots. Pick a rival and **flick your phone** to throw:

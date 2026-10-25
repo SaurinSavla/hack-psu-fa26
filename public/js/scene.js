@@ -5,6 +5,10 @@
 //   'showcase' – gentle sway around the front view (end of turn)
 //   'spin'     – continuous 360° turntable (podium gallery)
 //   'drawer'   – camera sits at the origin and follows the phone's orientation ("magic window")
+//   'peek'     – the drawer steps outside to see the sculpture from the audience's side (drag to orbit)
+//
+// The drawer can also spin the sculpture on a turntable to paint its sides and back. Strokes are always
+// stored and sent in "sculpture space"; only the drawer's own view is rotated (see turnBy / toSculpture).
 
 import * as THREE from 'three';
 
@@ -13,6 +17,9 @@ const smoothstep = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
+const IDENTITY = new THREE.Matrix4();
+const tmpM1 = new THREE.Matrix4();
+const tmpM2 = new THREE.Matrix4();
 
 export class Sculpture {
   constructor(canvas, opts = {}) {
@@ -59,7 +66,12 @@ export class Sculpture {
     scene.add(rim);
 
     this.root = new THREE.Group();
+    this.root.matrixAutoUpdate = false; // driven by the turntable
     scene.add(this.root);
+    this.turn = { angle: 0, target: 0, pivot: new THREE.Vector3(0, 0, -1) };
+    this.turnMatrix = new THREE.Matrix4();
+    this.turnInverse = new THREE.Matrix4();
+    this.drawerEye = new THREE.Vector3(); // where the sculptor stands, in sculpture space
 
     this._buildEnvironment();
     this._buildCursor();
@@ -203,6 +215,7 @@ export class Sculpture {
     this.frontMarker.visible = drawer;
     this.avatar.visible = !drawer;
     this.reticle.visible = drawer;
+    this._applyTurn();
     if (drawer) {
       this.manual = null;
       this.camera.position.set(0, 0, 0);
@@ -256,6 +269,70 @@ export class Sculpture {
 
   setProgressSource(fn) {
     this.progressFn = fn;
+  }
+
+  // ---------- turntable (drawer) ----------
+
+  /** Spin the sculpture by `delta` radians around a vertical axis, so its sides and back face the drawer. */
+  turnBy(delta) {
+    const tr = this.turn;
+    if (!tr.angle && !tr.target) {
+      // Spin around the middle of what has been sculpted so far (or the usual sculpting spot).
+      const c = this.bbox.isEmpty() ? new THREE.Vector3(0, 0, -1) : this.bbox.getCenter(new THREE.Vector3());
+      tr.pivot.set(c.x, 0, c.z);
+    }
+    tr.target += delta;
+  }
+
+  resetTurn() {
+    this.turn.angle = this.turn.target = 0;
+    this._applyTurn();
+  }
+
+  /** A point the drawer sees (world space) in sculpture space, which is what gets stored and sent. */
+  toSculpture(v) {
+    return v.clone().applyMatrix4(this.turnInverse);
+  }
+
+  /** The drawer's own position in sculpture space. */
+  eye() {
+    return new THREE.Vector3().applyMatrix4(this.turnInverse);
+  }
+
+  _applyTurn() {
+    const { angle, pivot } = this.turn;
+    this.turnMatrix
+      .makeTranslation(pivot.x, pivot.y, pivot.z)
+      .multiply(tmpM1.makeRotationY(angle))
+      .multiply(tmpM2.makeTranslation(-pivot.x, -pivot.y, -pivot.z));
+    this.turnInverse.copy(this.turnMatrix).invert();
+    // Only the drawer's own view is spun; everyone else (and a peeking drawer) sees the sculpture as stored.
+    this.root.matrix.copy(this.mode === 'drawer' ? this.turnMatrix : IDENTITY);
+    this.root.matrixWorldNeedsUpdate = true;
+    if (this.mode === 'drawer') this.frontMarker.visible = Math.abs(angle) < 0.02;
+  }
+
+  _stepTurn(dt) {
+    const tr = this.turn;
+    if (tr.angle === tr.target) return;
+    tr.angle += (tr.target - tr.angle) * (this.instant ? 1 : 1 - Math.exp(-dt * 10));
+    if (Math.abs(tr.target - tr.angle) < 0.002) {
+      // Settled: wrap full turns so the angle stays small.
+      tr.target -= Math.round(tr.target / TAU) * TAU;
+      tr.angle = tr.target;
+    }
+    this._applyTurn();
+  }
+
+  /** Viewers: where the sculptor stands relative to the sculpture ([x,y,z] in sculpture space, or null for the origin). */
+  setDrawerEye(e) {
+    if (e) this.drawerEye.set(e[0], e[1], e[2]);
+    else this.drawerEye.set(0, 0, 0);
+    this.avatar.position.copy(this.drawerEye);
+    const pos = this.ray.geometry.attributes.position;
+    pos.setXYZ(0, this.drawerEye.x, this.drawerEye.y, this.drawerEye.z);
+    pos.needsUpdate = true;
+    this.ray.computeLineDistances();
   }
 
   setDrawerQuaternion(q) {
@@ -338,6 +415,9 @@ export class Sculpture {
     } else if (this.mode === 'showcase') {
       az = Math.sin(t * 0.45) * 0.65;
       el = 0.18 + Math.sin(t * 0.3) * 0.12;
+    } else if (this.mode === 'peek') {
+      az = 0; // straight on, as the audience will finally see it
+      el = 0.2;
     } else {
       az = t * 0.55;
       el = 0.22 + Math.sin(t * 0.4) * 0.1;
@@ -375,7 +455,7 @@ export class Sculpture {
     this.camera.position.copy(this.target).addScaledVector(dir, dist);
     this.camera.lookAt(this.target);
     // Hide the drawer orb if the camera is about to clip through it.
-    this.avatar.visible = !this.hideAvatar && this.camera.position.length() > 0.35;
+    this.avatar.visible = !this.hideAvatar && this.camera.position.distanceTo(this.avatar.position) > 0.35;
   }
 
   // ---------- strokes ----------
@@ -527,6 +607,7 @@ export class Sculpture {
   step(dt, now = performance.now()) {
     this.time += dt;
     this._stepPlayback();
+    this._stepTurn(dt);
     for (const s of this.strokes.values()) if (s.dirty) this._rebuild(s, now);
     if (this.cursor.visible) {
       const pulse = this.cursorDrawing ? 0.045 + Math.sin(this.time * 14) * 0.008 : 0.03;

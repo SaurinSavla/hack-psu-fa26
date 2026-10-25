@@ -118,6 +118,7 @@ function onPhaseChange(from, to) {
   if (from === 'podium' && to === 'choose') currentGameId++;
   if (to === 'draw' && isDrawer()) sculptCountdown();
   if (to !== 'draw') clearEffects();
+  if (to !== 'draw' && to !== 'reveal') scene.setDrawerEye(null);
   if (to === 'choose') {
     scene.clear();
     if (state.drawerId === me?.playerId) { vibrate([60, 40, 60]); sfx.start(); }
@@ -338,6 +339,7 @@ socket.on('stroke:points', ({ id, pts }) => !practicing && scene.appendPoints(id
 socket.on('stroke:undo', ({ id }) => !practicing && scene.removeStroke(id));
 socket.on('stroke:clear', () => !practicing && scene.clear());
 socket.on('cursor', ({ p, drawing, color }) => scene.setCursor(p, color, drawing));
+socket.on('drawer:view', ({ e }) => !practicing && !isDrawer() && scene.setDrawerEye(e));
 
 // =====================================================================
 // Drawer: sculpting in the air
@@ -358,6 +360,10 @@ const draw = {
   // Fallback (no gyro): look around by dragging.
   yaw: 0,
   pitch: 0,
+  // Peeking at the sculpture from the audience's side, and where we last told viewers we stand.
+  peek: false,
+  lastEye: null,
+  lastEyeSent: 0,
 };
 
 function buildSwatches() {
@@ -375,15 +381,17 @@ $('#swatches').addEventListener('click', (e) => {
 });
 
 function enterDraw() {
-  scene.setMode('drawer');
+  setPeek(false, true); // also switches the scene to the drawer's view
+  scene.resetTurn();
+  renderTurnBar();
   if (!draw.color) setColor(me?.color && SWATCHES.includes(me.color) ? me.color : SWATCHES[0]);
   $('#practiceDone').classList.toggle('hidden', !practicing);
   $('#drawTimer').classList.toggle('hidden', practicing);
   if (motion.hasOrientation) motion.recenter();
   const coach = $('#coach');
   coach.innerHTML = motion.hasOrientation
-    ? `Hold your phone up like a camera and <b>point at the TV</b>, then tap <b>⟲</b>.<br/><br/><b>Hold the button</b> &amp; sweep to paint. <b>Twist</b> your wrist to push ink farther away.`
-    : `<b>No motion sensors detected.</b><br/>Drag the screen to look around. Hold the button (or <b>Space</b>) to sculpt. Scroll to change depth.`;
+    ? `Hold your phone up like a camera and <b>point at the TV</b>, then tap <b>⟲</b>.<br/><br/><b>Hold the button</b> &amp; sweep to paint. <b>Twist</b> your wrist to push ink farther away.<br/><br/><b>◀ ▶</b> spin your sculpture to paint its sides and back. <b>👁</b> peeks at it from the audience's side.`
+    : `<b>No motion sensors detected.</b><br/>Drag the screen to look around. Hold the button (or <b>Space</b>) to sculpt. Scroll to change depth.<br/><br/><b>◀ ▶</b> (or <b>Q</b>/<b>E</b>) spin your sculpture. <b>👁</b> (or <b>V</b>) peeks at it from the audience's side.`;
   coach.style.opacity = '1';
   coach.classList.remove('hidden');
   clearTimeout(enterDraw.t);
@@ -407,7 +415,7 @@ $('#practiceBtn').addEventListener('click', () => { unlockAudio(); startPractice
 $('#practiceDone').addEventListener('click', stopPractice);
 
 function startStroke() {
-  if (screen !== 'sDraw' || draw.active) return;
+  if (screen !== 'sDraw' || draw.active || draw.peek) return;
   if (!practicing && performance.now() < countdownUntil) return; // wait for "SCULPT!"
   if (!practicing && !(state && state.phase === 'draw' && isDrawer())) return;
   if (!practicing && sculptureFull()) return;
@@ -415,7 +423,8 @@ function startStroke() {
   draw.strokeId = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
   const p = currentPoint();
   const width = SIZES[draw.sizeIdx].w;
-  const pts = [round(p.x), round(p.y), round(p.z)];
+  const s = scene.toSculpture(p); // undo the turntable spin, so everyone sees the ink where it belongs
+  const pts = [round(s.x), round(s.y), round(s.z)];
   scene.addStroke({ id: draw.strokeId, color: draw.color, width, pts });
   draw.last = p.clone();
   draw.pending = [];
@@ -495,6 +504,7 @@ function currentPoint() {
 const holdBtn = $('#holdBtn');
 holdBtn.addEventListener('pointerdown', (e) => {
   e.preventDefault();
+  if (draw.peek) return setPeek(false); // while peeking, the big button means "back to sculpting"
   holdBtn.setPointerCapture(e.pointerId);
   startStroke();
 });
@@ -507,6 +517,62 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') endStroke();
 });
+window.addEventListener('keydown', (e) => {
+  if (screen !== 'sDraw' || e.repeat || e.target.matches?.('input, textarea')) return;
+  if (e.code === 'KeyQ') turnSculpture(-1);
+  else if (e.code === 'KeyE') turnSculpture(1);
+  else if (e.code === 'KeyV') setPeek(!draw.peek);
+});
+
+// ---------- Turntable & peek: paint every side of a 3D object ----------
+
+const TURN_NAMES = ['front', 'front-left', 'left side', 'back-left', 'back', 'back-right', 'right side', 'front-right'];
+
+/** Spin the sculpture an eighth of a turn (dir = -1 or 1) so a different side faces you. */
+function turnSculpture(dir) {
+  setPeek(false);
+  scene.turnBy((dir * Math.PI) / 4);
+  renderTurnBar();
+  vibrate(10);
+}
+
+function setPeek(on, force = false) {
+  if (on === draw.peek && !force) return;
+  endStroke();
+  draw.peek = on;
+  scene.setMode(on ? 'peek' : 'drawer');
+  if (on) {
+    scene.resetOrbit();
+    scene.setDrawerEye(scene.eye().toArray()); // show yourself where you're standing
+  }
+  $('#sDraw').classList.toggle('peeking', on);
+  $('#holdBtn').innerHTML = on ? 'Back to<br />sculpting' : 'Hold to<br />sculpt';
+  renderTurnBar();
+  if (!force) vibrate(10);
+}
+
+function renderTurnBar() {
+  const step = ((Math.round(scene.turn.target / (Math.PI / 4)) % 8) + 8) % 8;
+  $('#turnLabel').innerHTML = draw.peek
+    ? '<small>peeking · drag to look around</small><b>Audience view</b>'
+    : `<small>you're painting the</small><b>${TURN_NAMES[step]}</b>`;
+  $('#turnBar').classList.toggle('turned', step !== 0 && !draw.peek);
+  $('#peekBtn').classList.toggle('on', draw.peek);
+}
+
+$('#turnLeft').addEventListener('click', () => turnSculpture(-1));
+$('#turnRight').addEventListener('click', () => turnSculpture(1));
+$('#peekBtn').addEventListener('click', () => setPeek(!draw.peek));
+
+/** Tell viewers where we stand relative to the sculpture, so their view of us matches after a spin. */
+function sendEye(now) {
+  const e = scene.eye();
+  const moved = !draw.lastEye || e.distanceTo(draw.lastEye) > 0.01;
+  if (!moved && now - draw.lastEyeSent < 2000) return;
+  draw.lastEye = e;
+  draw.lastEyeSent = now;
+  socket.emit('draw:view', { e: [round(e.x), round(e.y), round(e.z)] });
+}
 
 // Canvas gestures:
 //   drawer without gyro → drag to look around, scroll for depth
@@ -515,9 +581,10 @@ const canvas = $('#scene');
 const pointers = new Map();
 let pinchDist = null;
 let lastTap = 0;
+const orbiting = () => screen === 'sGuess' || (screen === 'sDraw' && draw.peek);
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (screen === 'sGuess') {
+  if (orbiting()) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
     const now = performance.now();
@@ -530,7 +597,7 @@ canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (screen === 'sGuess' && pointers.has(e.pointerId)) {
+  if (orbiting() && pointers.has(e.pointerId)) {
     const prev = pointers.get(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
@@ -556,7 +623,7 @@ const endPointer = (e) => {
 };
 ['pointerup', 'pointercancel'].forEach((ev) => canvas.addEventListener(ev, endPointer));
 canvas.addEventListener('wheel', (e) => {
-  if (screen === 'sGuess') {
+  if (orbiting()) {
     scene.zoomBy(e.deltaY > 0 ? 1.08 : 0.93);
     updateViewUi();
     return;
@@ -609,7 +676,7 @@ function frame(now) {
   lastFrame = now;
 
   if (screen === 'sLobby') updateSensorTest();
-  if (screen !== 'sDraw') return;
+  if (screen !== 'sDraw' || draw.peek) return; // while peeking, the scene orbits on its own
 
   const q = currentQuaternion(dt);
   scene.setDrawerQuaternion(q);
@@ -633,7 +700,8 @@ function frame(now) {
 
   if (draw.active && draw.strokeId) {
     if (p.distanceTo(draw.last) > 0.008) {
-      const pts = [round(p.x), round(p.y), round(p.z)];
+      const s = scene.toSculpture(p);
+      const pts = [round(s.x), round(s.y), round(s.z)];
       scene.appendPoints(draw.strokeId, pts);
       draw.pending.push(...pts);
       draw.last.copy(p);
@@ -642,7 +710,9 @@ function frame(now) {
   }
   if (!practicing && now - draw.lastCursor > 70 && state?.phase === 'draw') {
     draw.lastCursor = now;
-    socket.emit('draw:cursor', { p: [round(p.x), round(p.y), round(p.z)], drawing: draw.active, color: draw.color });
+    const c = scene.toSculpture(p);
+    socket.emit('draw:cursor', { p: [round(c.x), round(c.y), round(c.z)], drawing: draw.active, color: draw.color });
+    sendEye(now);
   }
 }
 requestAnimationFrame(frame);
