@@ -798,3 +798,147 @@ body.phone {
   padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 0.9rem; text-align: center; pointer-events: none;
   background: rgba(19, 22, 43, 0.92); border: 1.5px solid var(--lime); color: var(--text); animation: pop 0.25s both;
 }
+
+/* ---------- Compact depth slider + paint toggles (overrides) ---------- */
+.depth { width: 34px; height: 32%; right: 6px; padding: 4px 0; font-size: 0.5rem; }
+.depth .track { top: 16px; bottom: 16px; width: 4px; margin-left: -2px; }
+.depth .knob { width: 24px; height: 24px; margin-left: -12px; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12), 0 0 10px rgba(255, 255, 255, 0.5); }
+.depth .knob b { font-size: 0.5rem; }
+.depth-flash { right: 46px; font-size: 0.7rem; padding: 3px 8px; }
+.depth.snapped::after { bottom: -20px; font-size: 0.55rem; }
+.tools .toggle { border-style: dashed; }
+.tools .toggle.on { border-style: solid; border-color: var(--violet); background: rgba(167, 123, 255, 0.18); }
+.tools .toggle.on span { color: var(--text); }
+
+/* =================================================================== */
+/* PICTIONARY 64 — title logo                                           */
+/* =================================================================== */
+
+.p64 {
+  --mk: 'Permanent Marker', 'Bricolage Grotesque', cursive;
+  --chunk: 'Bungee', 'Bricolage Grotesque', system-ui, sans-serif;
+  position: relative; display: inline-flex; flex-direction: column; align-items: flex-start;
+  font-size: 1em; line-height: 1; isolation: isolate;
+}
+.menu .p64 { font-size: 1em; margin-left: -0.2em; }
+
+/* Paint splats behind the logo */
+.p64-splats { position: absolute; z-index: -1; left: -8%; top: -18%; width: 116%; height: 136%; overflow: visible; }
+.p64-splats .splat { transform-box: fill-box; transform-origin: center; opacity: 0; animation: splat 0.55s cubic-bezier(.2, 1.7, .4, 1) forwards; }
+.p64-splats .s1 { fill: rgba(255, 93, 115, 0.22); animation-delay: 0.15s; }
+.p64-splats .s2 { fill: rgba(61, 224, 255, 0.18); animation-delay: 0.45s; }
+.p64-splats .s3 { fill: rgba(198, 255, 61, 0.18); animation-delay: 0.75s; }
+@keyframes splat { 0% { opacity: 0; transform: scale(0.2) rotate(-20deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+
+/* "PICTIONARY": hand-painted marker letters, each its own paint colour */
+.p64-word {
+  margin: 0; font-family: var(--mk); font-weight: 400; letter-spacing: 0.02em;
+  font-size: 5.4em; display: flex; gap: 0.02em;
+}
+.p64-word span {
+  display: inline-block; color: var(--c);
+  transform: rotate(var(--r));
+  text-shadow: 0 0.04em 0 rgba(0, 0, 0, 0.35), 0 0 0.35em color-mix(in srgb, var(--c) 45%, transparent);
+  animation: letterIn 0.6s cubic-bezier(.3, 1.8, .5, 1) both, letterBob 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 70ms), calc(0.9s + var(--i) * 140ms);
+}
+@keyframes letterIn {
+  0% { opacity: 0; transform: translateY(-0.9em) rotate(calc(var(--r) * -3)) scale(0.6); }
+  100% { opacity: 1; transform: translateY(0) rotate(var(--r)) scale(1); }
+}
+@keyframes letterBob {
+  0%, 100% { transform: translateY(0) rotate(var(--r)); }
+  50% { transform: translateY(-0.06em) rotate(calc(var(--r) * -0.6)); }
+}
+
+/* "64": chunky retro 3D number with a moving rainbow fill and a deep extrusion */
+.p64-num {
+  position: relative; margin-top: -0.05em; margin-left: 0.04em;
+  font-family: var(--chunk); font-size: 7.2em; line-height: 0.9; letter-spacing: -0.02em;
+  transform: rotate(-4deg) skewX(-6deg);
+  animation: numIn 0.8s cubic-bezier(.25, 1.6, .45, 1) 0.65s both, numFloat 5s ease-in-out 1.5s infinite;
+}
+.p64-num::before, .p64-num::after { content: attr(data-text); position: absolute; left: 0; top: 0; }
+/* the extruded "side" of the 3D number */
+.p64-num::before {
+  z-index: -1; color: #1a1340;
+  text-shadow:
+    0.012em 0.012em 0 #2a1d63, 0.024em 0.024em 0 #2a1d63, 0.036em 0.036em 0 #33237a,
+    0.048em 0.048em 0 #33237a, 0.06em 0.06em 0 #3c2a8f, 0.072em 0.072em 0 #3c2a8f,
+    0.09em 0.1em 0.12em rgba(0, 0, 0, 0.55);
+}
+/* rainbow paint face */
+.p64-num::after {
+  background: linear-gradient(100deg, #ff5d73 0%, #ffb53d 20%, #ffe53d 35%, #c6ff3d 50%, #3de0ff 65%, #a77bff 80%, #ff5d73 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: paintFlow 6s linear infinite;
+}
+.p64-num { color: transparent; } /* the real glyphs only reserve space */
+@keyframes numIn { 0% { opacity: 0; transform: rotate(-24deg) skewX(-6deg) scale(0.3); } 100% { opacity: 1; transform: rotate(-4deg) skewX(-6deg) scale(1); } }
+@keyframes numFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -0.05em; } }
+@keyframes paintFlow { to { background-position: 220% 0; } }
+
+/* Brush stroke that paints itself under the logo */
+.p64-stroke { width: 100%; height: 0.9em; margin-top: 0.15em; overflow: visible; }
+.p64-stroke path {
+  fill: none; stroke: url(#p64g); stroke-width: 14; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 700; stroke-dashoffset: 700; opacity: 0.9;
+  animation: brush 1.1s cubic-bezier(.6, 0, .3, 1) 1.2s forwards;
+  filter: drop-shadow(0 0 6px rgba(167, 123, 255, 0.45));
+}
+@keyframes brush { to { stroke-dashoffset: 0; } }
+
+/* Floating doodles on the title screen */
+.doodles { position: absolute; inset: 0; pointer-events: none; z-index: -1; }
+.doodles i {
+  position: absolute; left: var(--x); top: var(--y); font-style: normal; font-size: 2.2em; opacity: 0.22;
+  animation: doodle 9s ease-in-out var(--d) infinite; filter: saturate(1.3);
+}
+@keyframes doodle {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  33% { transform: translate(0.6em, -0.8em) rotate(10deg); }
+  66% { transform: translate(-0.5em, -0.3em) rotate(-4deg); }
+}
+.menu { position: relative; }
+
+/* Phone join screen: smaller, centred version */
+.p64.p64-sm { align-items: center; font-size: 6px; margin: 4px auto 6px; }
+.p64.p64-sm .p64-word { font-size: 7.4em; }
+.p64.p64-sm .p64-num { font-size: 11em; margin-left: 0; }
+.p64.p64-sm .p64-stroke { height: 3.2em; width: 90%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .p64 *, .p64 *::before, .p64 *::after, .doodles i { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
+  .p64-stroke path { stroke-dashoffset: 0; }
+}
+
+/* Logo layout tweaks: hug the logo, and let the big "64" overlap the end of the word like a sticker */
+.menu .p64 { align-self: flex-start; }
+.p64 .p64-num { align-self: flex-end; margin-top: -0.12em; margin-right: -0.14em; font-size: 8em; }
+.p64 .p64-stroke { margin-top: -0.3em; }
+.p64.p64-sm .p64-num { align-self: center; margin-right: 0; margin-top: 0.06em; font-size: 10.5em; }
+.p64.p64-sm .p64-stroke { margin-top: -0.2em; }
+
+.shape-hint {
+  position: absolute; z-index: 3; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: 92vw;
+  top: calc(max(12px, env(safe-area-inset-top)) + 112px);
+  padding: 5px 12px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; color: var(--muted);
+  background: rgba(19, 22, 43, 0.85); border: 1px solid var(--line); pointer-events: none;
+}
+
+/* Leader controls */
+.pcard .mklead, .prow .mklead {
+  border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 999px;
+  width: 30px; height: 30px; font-size: 0.9rem; cursor: pointer; opacity: 0.35; filter: grayscale(1);
+  transition: opacity .15s, filter .15s, transform .15s; flex: none;
+}
+.pcard .mklead:hover, .prow .mklead:active { opacity: 1; filter: none; transform: scale(1.1); }
+.pcard .lead-tag { font-size: 1.05rem; flex: none; }
+.pcard.leader { border-color: rgba(255, 209, 102, 0.6); box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.25) inset; }
+.demo-preset { width: 100%; margin-bottom: 8px; }
+.demo-preset.on { background: linear-gradient(90deg, #2bd9a2, #39c2ff); color: #08101f; }
+.pcard .mklead { position: absolute; right: 2.7em; top: 50%; transform: translateY(-50%); width: 1.9em; height: 1.9em; font-size: 1em; }
+.pcard .mklead:hover { transform: translateY(-50%) scale(1.12); }
+.pcard .lead-tag { margin-left: auto; padding-right: 2.4em; }
+.pcard:has(.mklead) span:not(.ai-tag) { padding-right: 4.6em; }

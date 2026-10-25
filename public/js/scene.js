@@ -23,6 +23,49 @@ const tmpM1 = new THREE.Matrix4();
 const tmpM2 = new THREE.Matrix4();
 const tmpM3 = new THREE.Matrix4();
 
+/** A flat strip along `pts`, facing `normal`, `width` wide (flat paint). */
+function ribbonGeometry(pts, normal, width) {
+  if (pts.length === 1) {
+    const g = new THREE.CircleGeometry(width * 0.6, 16);
+    g.lookAt(normal);
+    g.translate(pts[0].x, pts[0].y, pts[0].z);
+    return g;
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  const n = Math.min(900, Math.max(2, pts.length * 3));
+  const samples = curve.getSpacedPoints(n);
+  const pos = [];
+  const nor = [];
+  const idx = [];
+  const half = width / 2;
+  const side = new THREE.Vector3();
+  const prevSide = new THREE.Vector3(1, 0, 0);
+  for (let i = 0; i < samples.length; i++) {
+    const a = samples[Math.max(0, i - 1)];
+    const b = samples[Math.min(samples.length - 1, i + 1)];
+    const t = b.clone().sub(a);
+    side.crossVectors(t, normal);
+    if (side.lengthSq() < 1e-10) side.copy(prevSide);
+    side.normalize();
+    prevSide.copy(side);
+    // Round-ish ends: taper the first and last few samples.
+    const k = Math.min(1, (i + 1) / 3, (samples.length - i) / 3);
+    const p = samples[i];
+    pos.push(p.x + side.x * half * k, p.y + side.y * half * k, p.z + side.z * half * k);
+    pos.push(p.x - side.x * half * k, p.y - side.y * half * k, p.z - side.z * half * k);
+    nor.push(normal.x, normal.y, normal.z, normal.x, normal.y, normal.z);
+    if (i > 0) {
+      const j = i * 2;
+      idx.push(j - 2, j - 1, j, j - 1, j + 1, j);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 export class Sculpture {
   constructor(canvas, opts = {}) {
     this.canvas = canvas;
@@ -186,8 +229,8 @@ export class Sculpture {
 
     // "Front" marker: where everyone is watching from.
     const front = new THREE.Mesh(
-      new THREE.RingGeometry(0.06, 0.075, 32),
-      new THREE.MeshBasicMaterial({ color: 0xc6ff3d, transparent: true, opacity: 0.5, side: THREE.DoubleSide, fog: false })
+      new THREE.RingGeometry(0.028, 0.034, 32),
+      new THREE.MeshBasicMaterial({ color: 0xc6ff3d, transparent: true, opacity: 0.3, side: THREE.DoubleSide, fog: false })
     );
     front.position.set(0, 0, -1);
     this.frontMarker = front;
@@ -220,6 +263,7 @@ export class Sculpture {
     if (!drawer) {
       this.setGhost(null);
       this.setSurfaceMarker(null);
+      if (this.mirrorPlane) this.mirrorPlane.visible = false;
     }
     this._applyTurn();
     if (drawer) {
@@ -328,7 +372,7 @@ export class Sculpture {
   setSurfaceMarker(point, normal, color) {
     if (!this.surfMarker) {
       const m = new THREE.Mesh(
-        new THREE.RingGeometry(0.035, 0.05, 32),
+        new THREE.RingGeometry(0.017, 0.024, 32),
         new THREE.MeshBasicMaterial({ color: 0xc6ff3d, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false })
       );
       m.renderOrder = 11;
@@ -345,6 +389,53 @@ export class Sculpture {
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     m.scale.setScalar(Math.max(0.6, point.length()));
     if (color) m.material.color.set(color);
+  }
+
+  /** Is a screen point (client coords) on the shape preview? Generous, so it's easy to grab with a thumb. */
+  ghostHit(clientX, clientY) {
+    const g = this.ghost;
+    if (!g || !g.visible) return false;
+    const rect = this.canvas.getBoundingClientRect();
+    this.scene.updateMatrixWorld();
+    const c = g.getWorldPosition(new THREE.Vector3());
+    const r = shapeGeometry(g.userData.t).radius * g.scale.x;
+    const edge = c.clone().addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion), r);
+    const toPx = (v) => {
+      const p = v.clone().project(this.camera);
+      return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height, z: p.z };
+    };
+    const pc = toPx(c);
+    if (pc.z > 1) return false;
+    const pe = toPx(edge);
+    const rPx = Math.max(70, Math.hypot(pe.x - pc.x, pe.y - pc.y) * 1.25);
+    return Math.hypot(clientX - pc.x, clientY - pc.y) <= rPx;
+  }
+
+  /** Mirror mode guide: a faint vertical plane down the middle of the sculpture (x = 0). */
+  setMirrorPlane(on) {
+    if (!this.mirrorPlane) {
+      const g = new THREE.Group();
+      const fill = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.6, 1.6),
+        new THREE.MeshBasicMaterial({ color: 0x3de0ff, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false })
+      );
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.6, 1.6)),
+        new THREE.LineBasicMaterial({ color: 0x3de0ff, transparent: true, opacity: 0.5 })
+      );
+      const mid = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.8, 0), new THREE.Vector3(0, 0.8, 0)]),
+        new THREE.LineDashedMaterial({ color: 0x3de0ff, dashSize: 0.04, gapSize: 0.03, transparent: true, opacity: 0.8 })
+      );
+      mid.computeLineDistances();
+      g.add(fill, edge, mid);
+      g.rotation.y = Math.PI / 2;
+      g.position.set(0, 0, -1);
+      g.traverse((o) => (o.raycast = () => {}));
+      this.mirrorPlane = g;
+      this.root.add(g);
+    }
+    this.mirrorPlane.visible = !!on && this.mode === 'drawer';
   }
 
   // ---------- turntable (drawer) ----------
@@ -443,7 +534,7 @@ export class Sculpture {
     this.reticle.position.copy(pos);
     this.reticle.material.color.set(color || '#ffffff');
     // Bigger when drawing, scaled with distance so it reads as depth.
-    this.reticle.scale.setScalar((drawing ? 0.03 : 0.02) * Math.max(0.6, pos.length()));
+    this.reticle.scale.setScalar((drawing ? 0.016 : 0.011) * Math.max(0.6, pos.length()));
   }
 
   setCursor(p, color, drawing) {
@@ -560,7 +651,7 @@ export class Sculpture {
 
   // ---------- strokes ----------
 
-  addStroke({ id, color, width, pts, shape }) {
+  addStroke({ id, color, width, pts, shape, fn }) {
     if (this.strokes.has(id)) this.removeStroke(id);
     if (shape) {
       // A stamped solid shape: one point (its centre) plus rotation and size.
@@ -581,6 +672,11 @@ export class Sculpture {
       metalness: 0.15,
     });
     const s = { id, color, width: width || 0.02, points: [], mesh: new THREE.Mesh(new THREE.BufferGeometry(), mat), dirty: true, lastBuild: 0 };
+    if (Array.isArray(fn) && fn.length === 3) {
+      // Flat paint: a ribbon lying flat, facing `fn` (like a brush stroke on a wall).
+      s.fn = new THREE.Vector3(fn[0], fn[1], fn[2]).normalize();
+      mat.side = THREE.DoubleSide;
+    }
     this.root.add(s.mesh);
     this.strokes.set(id, s);
     this.order.push(id);
@@ -663,7 +759,7 @@ export class Sculpture {
     this.clear();
     const total = list.reduce((n, s) => n + s.pts.length / 3, 0) || 1;
     const job = { list, ms, start: performance.now(), done: 0, idx: 0, offset: 0, total };
-    list.forEach((s, i) => this.addStroke({ id: `p${i}`, color: s.color, width: s.width, pts: [], shape: s.shape }));
+    list.forEach((s, i) => this.addStroke({ id: `p${i}`, color: s.color, width: s.width, pts: [], shape: s.shape, fn: s.fn }));
     this.playbackJob = job;
   }
 
@@ -713,6 +809,8 @@ export class Sculpture {
     const pts = s.points;
     if (pts.length === 0) {
       geo = new THREE.BufferGeometry();
+    } else if (s.fn) {
+      geo = ribbonGeometry(pts, s.fn, s.width * 1.6);
     } else if (pts.length === 1 || (pts.length === 2 && pts[0].distanceTo(pts[1]) < 1e-4)) {
       geo = new THREE.SphereGeometry(s.width * 1.2, 16, 12);
       geo.translate(pts[0].x, pts[0].y, pts[0].z);

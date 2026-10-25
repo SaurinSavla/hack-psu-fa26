@@ -118,3 +118,6 @@ export function makeShapeMesh(type, color, { ghost = false } = {}) {
   mesh.userData.isShape = true;
   return mesh;
 }
+
+/** The shapes offered in the sculptor's tool row: the most useful building blocks, in a sensible order. */
+export const TOOL_SHAPES = ['sphere', 'cube', 'cylinder', 'cone', 'cuboid', 'pyramid', 'egg', 'dome', 'torus', 'board'];

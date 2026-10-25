@@ -288,6 +288,11 @@ async function main() {
       if (!isHost || !room) return ack(cb)({ ok: false });
       ack(cb)(room.restart());
     });
+    socket.on('player:lead', ({ playerId: pid } = {}) => {
+      // The TV host, or the current leader from their phone, can hand the 👑 to someone else.
+      if (!room || !(isHost || (playerId && room.isVip(playerId)))) return;
+      room.setLeader(pid);
+    });
     socket.on('player:kick', ({ playerId: pid } = {}) => {
       // The TV host, or the party leader (first player) from their phone, can remove others in the lobby.
       if (!room || !(isHost || (playerId && room.isVip(playerId) && pid !== playerId))) return;

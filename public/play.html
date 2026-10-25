@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0d1a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>Sculpt &amp; Spin</title>
+  <title>Pictionary 64</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Bungee&family=Permanent+Marker&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="phone">
@@ -17,8 +17,22 @@
 
   <!-- JOIN -->
   <section class="screen center" id="sJoin">
-    <div class="logo">Sculpt <span class="amp">&amp;</span><br /><span class="spin">Spin</span></div>
-    <div class="tag">Paint in the air. Guess the spin.</div>
+    <div class="p64 p64-sm" role="img" aria-label="Pictionary 64">
+        <svg class="p64-splats" viewBox="0 0 600 300" aria-hidden="true">
+          <path class="splat s1" d="M120 70c22-30 70-28 84 2 18-14 44-6 44 18 26 2 34 36 10 50 14 22-10 46-34 34-8 28-52 30-62 4-28 10-52-14-40-38-26-8-24-44 2-50-4-14 6-22 18-20z"/>
+          <path class="splat s2" d="M430 40c18-18 52-10 56 14 24-4 38 22 22 40 20 12 12 44-14 44 4 26-30 40-48 22-16 20-50 10-50-14-26-2-32-36-8-48-10-22 14-44 36-34 0-12 2-20 6-24z"/>
+          <path class="splat s3" d="M300 210c14-16 40-12 46 6 20-2 30 20 16 34 10 18-8 36-28 28-8 18-38 18-44-2-20 4-32-18-18-32-12-16 4-36 22-30 0-2 2-3 6-4z"/>
+          <circle class="splat s1" cx="236" cy="56" r="7"/><circle class="splat s2" cx="402" cy="128" r="9"/><circle class="splat s3" cx="356" cy="268" r="6"/>
+          <circle class="splat s2" cx="508" cy="34" r="5"/><circle class="splat s1" cx="96" cy="150" r="6"/>
+        </svg>
+        <h1 class="p64-word"><span style="--i:0;--c:#ff5d73;--r:-6deg">P</span><span style="--i:1;--c:#ffb53d;--r:4deg">I</span><span style="--i:2;--c:#ffe53d;--r:-3deg">C</span><span style="--i:3;--c:#c6ff3d;--r:5deg">T</span><span style="--i:4;--c:#3dffa8;--r:-4deg">I</span><span style="--i:5;--c:#3de0ff;--r:3deg">O</span><span style="--i:6;--c:#5d8bff;--r:-5deg">N</span><span style="--i:7;--c:#a77bff;--r:4deg">A</span><span style="--i:8;--c:#ff7ad9;--r:-2deg">R</span><span style="--i:9;--c:#ff8a3d;--r:6deg">Y</span></h1>
+        <div class="p64-num" data-text="64">64</div>
+        <svg class="p64-stroke" viewBox="0 0 600 60" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="p64g" x1="0" x2="1"><stop offset="0" stop-color="#ff5d73"/><stop offset=".35" stop-color="#ffb53d"/><stop offset=".65" stop-color="#3de0ff"/><stop offset="1" stop-color="#a77bff"/></linearGradient></defs>
+          <path d="M8 38 C 90 14, 170 52, 250 30 S 410 12, 470 34 S 560 44, 592 22"/>
+        </svg>
+      </div>
+    <div class="tag">Sculpt in the air. Guess the art.</div>
     <div class="field"><label for="name">Your name</label><input id="name" maxlength="14" autocomplete="nickname" placeholder="e.g. Maya" /></div>
     <div class="field"><label for="room">Room code</label><input id="room" class="code" maxlength="4" autocapitalize="characters" placeholder="ABCD" /></div>
     <button class="btn wide" id="joinBtn">Join game</button>
@@ -96,14 +110,8 @@
       <button class="icon-btn sm" id="turnRight" title="Spin the sculpture (E)" aria-label="Spin the sculpture right">▶</button>
       <button class="icon-btn sm" id="peekBtn" title="Peek from the audience's side (V)" aria-label="Peek at the sculpture from the audience's side">👁</button>
     </div>
-    <div class="rot-bar hidden" id="rotBar" role="toolbar" aria-label="Rotate the shape">
-      <small>Rotate</small>
-      <button class="ax ax-x" data-ax="x" aria-label="Rotate around X (tip forward)">X<i>⤼</i></button>
-      <button class="ax ax-y" data-ax="y" aria-label="Rotate around Y (spin)">Y<i>⟳</i></button>
-      <button class="ax ax-z" data-ax="z" aria-label="Rotate around Z (roll)">Z<i>↻</i></button>
-      <button class="ax ax-0" data-ax="reset" aria-label="Reset rotation">⟲</button>
-    </div>
     <div class="toast hidden" id="drawToast"></div>
+    <div class="shape-hint hidden" id="shapeHint">☝️ drag to turn · ✌️ twist to roll · double-tap to straighten</div>
     <div class="coach" id="coach"></div>
     <div class="help-card hidden" id="helpCard" role="dialog" aria-label="How to sculpt">
       <div class="help-head"><b>How to sculpt ✨</b><button class="icon-btn sm" id="helpClose" aria-label="Close">✕</button></div>

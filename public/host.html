@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sculpt &amp; Spin</title>
+  <title>Pictionary 64</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Bungee&family=Permanent+Marker&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="host">
@@ -16,8 +16,23 @@
   <!-- ============ TITLE MENU ============ -->
   <div class="layer" id="menu">
     <div class="menu">
-      <div class="logo">Sculpt <span class="amp">&amp;</span><br /><span class="spin">Spin</span></div>
-      <div class="tag">Paint in thin air with your phone. Everyone else races to guess your 3D sculpture while it spins into view.</div>
+      <div class="p64" role="img" aria-label="Pictionary 64">
+        <svg class="p64-splats" viewBox="0 0 600 300" aria-hidden="true">
+          <path class="splat s1" d="M120 70c22-30 70-28 84 2 18-14 44-6 44 18 26 2 34 36 10 50 14 22-10 46-34 34-8 28-52 30-62 4-28 10-52-14-40-38-26-8-24-44 2-50-4-14 6-22 18-20z"/>
+          <path class="splat s2" d="M430 40c18-18 52-10 56 14 24-4 38 22 22 40 20 12 12 44-14 44 4 26-30 40-48 22-16 20-50 10-50-14-26-2-32-36-8-48-10-22 14-44 36-34 0-12 2-20 6-24z"/>
+          <path class="splat s3" d="M300 210c14-16 40-12 46 6 20-2 30 20 16 34 10 18-8 36-28 28-8 18-38 18-44-2-20 4-32-18-18-32-12-16 4-36 22-30 0-2 2-3 6-4z"/>
+          <circle class="splat s1" cx="236" cy="56" r="7"/><circle class="splat s2" cx="402" cy="128" r="9"/><circle class="splat s3" cx="356" cy="268" r="6"/>
+          <circle class="splat s2" cx="508" cy="34" r="5"/><circle class="splat s1" cx="96" cy="150" r="6"/>
+        </svg>
+        <h1 class="p64-word"><span style="--i:0;--c:#ff5d73;--r:-6deg">P</span><span style="--i:1;--c:#ffb53d;--r:4deg">I</span><span style="--i:2;--c:#ffe53d;--r:-3deg">C</span><span style="--i:3;--c:#c6ff3d;--r:5deg">T</span><span style="--i:4;--c:#3dffa8;--r:-4deg">I</span><span style="--i:5;--c:#3de0ff;--r:3deg">O</span><span style="--i:6;--c:#5d8bff;--r:-5deg">N</span><span style="--i:7;--c:#a77bff;--r:4deg">A</span><span style="--i:8;--c:#ff7ad9;--r:-2deg">R</span><span style="--i:9;--c:#ff8a3d;--r:6deg">Y</span></h1>
+        <div class="p64-num" data-text="64">64</div>
+        <svg class="p64-stroke" viewBox="0 0 600 60" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="p64g" x1="0" x2="1"><stop offset="0" stop-color="#ff5d73"/><stop offset=".35" stop-color="#ffb53d"/><stop offset=".65" stop-color="#3de0ff"/><stop offset="1" stop-color="#a77bff"/></linearGradient></defs>
+          <path d="M8 38 C 90 14, 170 52, 250 30 S 410 12, 470 34 S 560 44, 592 22"/>
+        </svg>
+      </div>
+      <div class="tag">Sculpt in thin air with your phone. Everyone else races to guess your 3D masterpiece while it spins into view.</div>
+      <div class="doodles" aria-hidden="true"><i style="--x:52%;--y:12%;--d:0s">✏️</i><i style="--x:44%;--y:78%;--d:1.2s">⭐</i><i style="--x:8%;--y:88%;--d:2.4s">🎨</i><i style="--x:58%;--y:46%;--d:3.1s">🌀</i><i style="--x:3%;--y:8%;--d:1.8s">🖌️</i></div>
       <div class="menu-buttons">
         <button class="btn" id="mStart">▶&nbsp; Start game <span class="k">ENTER</span></button>
         <button class="btn ghost" id="mHowto">❓&nbsp; How to play <span class="k">H</span></button>
@@ -53,7 +68,7 @@
         <div>
           <div class="players-head">
             <h2>Players <span id="pcount" class="chip">0</span></h2>
-            <span class="chip">First to join can start from their phone</span>
+            <span class="chip">👑 Leader can start from their phone · tap 👑 to change</span>
           </div>
           <div class="players-grid" id="lobbyPlayers"></div>
         </div>
@@ -158,13 +173,13 @@
       <div class="panel-head"><h2>How to play</h2><button class="btn ghost" data-close>✕ Close</button></div>
       <div class="howto-grid">
         <div class="howto-card"><div class="ico">📱</div><b>1 · Join</b>Everyone scans the QR code on the TV with their phone. No app needed. 4+ players is best.</div>
-        <div class="howto-card"><div class="ico">✨</div><b>2 · Sculpt</b>On your turn, pick a word. Hold your phone up like a camera, <em>hold the button</em> and sweep through the air to paint. Drag the <em>depth slider</em> on the right to paint nearer or farther. Tap <em>◀ ▶</em> to spin your sculpture and paint its sides and back, and <em>👁</em> to peek at it like the audience. Add <em>3D shapes</em> (cube, cone, ring, star…): turn them with X/Y/Z or a <em>wrist flick</em>, hold to grow, let go to place, then paint right onto their surfaces. <em>Swipe</em> to see the top, bottom and sides. <em>Shake</em> to undo. Stuck? Tap <em>?</em>.</div>
+        <div class="howto-card"><div class="ico">✨</div><b>2 · Sculpt</b>On your turn, pick a word. Hold your phone up like a camera, <em>hold the button</em> and sweep through the air to paint. Drag the <em>depth slider</em> on the right to paint nearer or farther. Tap <em>◀ ▶</em> to spin your sculpture and paint its sides and back, and <em>👁</em> to peek at it like the audience. Add <em>3D shapes</em> (cube, cone, ring, star…): turn them by dragging the preview or a <em>wrist flick</em>, hold to grow, let go to place, then paint right onto their surfaces. <em>Swipe</em> to see the top, bottom and sides. <em>Shake</em> to undo. Stuck? Tap <em>?</em>.</div>
         <div class="howto-card"><div class="ico">🌀</div><b>3 · Spin</b>The TV shows the sculpture from a weird angle that slowly swings to the front. On your phone, <em>drag to orbit</em> it and pinch to zoom.</div>
         <div class="howto-card"><div class="ico">📳</div><b>4 · Shake &amp; guess</b><em>Shake your phone</em> to unlock a guess. A wrong guess freezes you for 4 seconds. The <em>first correct guess</em> ends the turn.</div>
         <div class="howto-card"><div class="ico">⚡</div><b>5 · Power-ups</b>Start with one, earn more by guessing right, and <em>grab power orbs</em> when they drop. Pick a rival and <em>flick your phone</em> to throw it:
           <div class="power-list"><span>🌫️ Fog their view</span><span>🙃 Flip it upside down</span><span>🌀 Make them dizzy</span><span>🧊 Freeze their guessing</span><span>💡 Secret letter for you</span><span>🛡️ Shield yourself</span></div>
         </div>
-        <div class="howto-card"><div class="ico">🤖</div><b>Bonus · Beat the AI</b>Gemini plays along: three times a turn it looks at the sculpture and takes a guess. If it gets there first, it steals the points. Throw power-ups at it to blind it! After each turn it reviews the sculpture out of 10.</div>
+        <div class="howto-card"><div class="ico">🤖</div><b>Bonus · Beat the AI</b>Gemini plays along: a couple of times a turn it looks at the sculpture and takes a guess (on <em>Easy</em> it only starts looking halfway through, so you get first crack). If it gets there first, it steals the points. Throw power-ups at it to blind it! After each turn it reviews the sculpture out of 10.</div>
         <div class="howto-card"><div class="ico">🏆</div><b>6 · Scoring</b>The guesser scores <em>100–500</em> points (faster = more), and the sculptor gets <em>half</em> of that. Hard words are worth ×1.5. Most points after the last round wins.</div>
       </div>
       <div class="panel-foot"><button class="btn" data-close>Got it</button></div>
@@ -175,6 +190,8 @@
   <div class="panel-wrap hidden" id="pSettings">
     <div class="panel">
       <div class="panel-head"><h2>Settings</h2><button class="btn ghost" data-close>✕ Close</button></div>
+      <button class="btn demo-preset" id="demoPreset">🎬&nbsp; Use demo setup</button>
+      <div class="hint-small" style="text-align:left;margin:-4px 0 6px">Demo setup: ⭐ super-easy words, 1 round, 90s turns, generous hints, an easy-going Gemini.</div>
       <div class="set-row"><div class="lbl"><b>Rounds</b><span>Everyone sculpts once per round</span></div>
         <div class="seg" id="segRounds"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div>
       </div>
@@ -189,6 +206,12 @@
       </div>
       <div class="set-row"><div class="lbl"><b>Power-ups</b><span>Fog, flip, freeze… sabotage your friends</span></div><button class="switch" id="swPowers"></button></div>
       <div class="set-row"><div class="lbl"><b>🤖 Gemini AI rival</b><span id="aiNote">An AI player that guesses your sculptures, and reviews each one</span></div><button class="switch" id="swAi"></button></div>
+      <div class="set-row"><div class="lbl"><b>🤖 Gemini skill</b><span>Easy: 2 looks, only in the second half of the turn, no letter hints</span></div>
+        <div class="seg" id="segAiLevel"><button data-v="easy">Easy</button><button data-v="fair">Fair</button></div>
+      </div>
+      <div class="set-row"><div class="lbl"><b>💡 Letter hints</b><span>Generous: a letter at the start, more at 30% and 55%</span></div>
+        <div class="seg" id="segHints"><button data-v="easy">Generous</button><button data-v="normal">Normal</button></div>
+      </div>
       <div class="set-row"><div class="lbl"><b>🎙️ AI announcer</b><span id="voiceNote">A game-show voice by ElevenLabs</span></div><button class="switch" id="swVoice"></button></div>
       <div class="set-row"><div class="lbl"><b>Sound</b><span>Effects on the TV</span></div><button class="switch" id="swSound"></button></div>
       <div class="panel-foot"><button class="btn" data-close>Save</button></div>

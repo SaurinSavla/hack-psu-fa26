@@ -27,12 +27,13 @@ const gifJobs = new Set();
 
 // ---------- settings (remembered on this laptop) ----------
 
-const DEFAULTS = { rounds: 2, drawTime: 60, packs: ['classic'], custom: '', powerups: true, sound: true, ai: true, announcer: true };
+const DEMO = { rounds: 1, drawTime: 90, packs: ['demo'], custom: '', powerups: true, ai: true, aiLevel: 'easy', hints: 'easy', announcer: true, sound: true };
+const DEFAULTS = { ...DEMO };
 const TIMES = [30, 60, 90, 180];
 let settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('sns-settings') || '{}') };
 if (!TIMES.includes(settings.drawTime)) settings.drawTime = 60; // older saved values
 const saveSettings = () => localStorage.setItem('sns-settings', JSON.stringify(settings));
-const serverSettings = () => ({ rounds: settings.rounds, drawTime: settings.drawTime, packs: settings.packs, custom: settings.custom, powerups: settings.powerups, ai: settings.ai });
+const serverSettings = () => ({ rounds: settings.rounds, drawTime: settings.drawTime, packs: settings.packs, custom: settings.custom, powerups: settings.powerups, ai: settings.ai, aiLevel: settings.aiLevel, hints: settings.hints });
 setMuted(!settings.sound);
 
 // ---------- AI: Gemini rival + ElevenLabs announcer ----------
@@ -227,15 +228,17 @@ function renderLobby(s) {
   $('#lobbyPlayers').innerHTML =
     players.map((p) => p.isAI
       ? `<div class="pcard ai">${avatar(p)}<span>${esc(p.name)}</span><span class="ai-tag">AI rival</span><button class="kick" data-kick="${p.id}" title="Turn off the AI rival">✕</button></div>`
-      : `<div class="pcard">${avatar(p)}<span>${esc(p.name)}</span><button class="kick" data-kick="${p.id}" title="Remove ${esc(p.name)}">✕</button></div>`).join('') +
+      : `<div class="pcard ${p.id === s.vipId ? 'leader' : ''}">${avatar(p)}<span>${esc(p.name)}</span>${p.id === s.vipId
+          ? '<span class="lead-tag" title="Party leader: can start the game and change settings from their phone">👑</span>'
+          : `<button class="mklead" data-lead="${p.id}" title="Make ${esc(p.name)} the party leader">👑</button>`}<button class="kick" data-kick="${p.id}" title="Remove ${esc(p.name)}">✕</button></div>`).join('') +
     Array.from({ length: Math.max(0, slots - players.length) }, (_, i) =>
       `<div class="pcard empty">${i === 0 ? 'Scan to join' : ''}</div>`).join('');
   $('#pcount').textContent = humans.length;
 
   const st = s.settings;
   // The party leader can change settings from their phone; mirror them here so the TV stays in sync.
-  const synced = { rounds: st.rounds, drawTime: st.drawTime, packs: st.packs, powerups: st.powerups, ai: s.aiAvailable ? st.ai : settings.ai };
-  if (JSON.stringify(synced) !== JSON.stringify({ rounds: settings.rounds, drawTime: settings.drawTime, packs: settings.packs, powerups: settings.powerups, ai: settings.ai })) {
+  const synced = { rounds: st.rounds, drawTime: st.drawTime, packs: st.packs, powerups: st.powerups, ai: s.aiAvailable ? st.ai : settings.ai, aiLevel: st.aiLevel, hints: st.hints };
+  if (JSON.stringify(synced) !== JSON.stringify({ rounds: settings.rounds, drawTime: settings.drawTime, packs: settings.packs, powerups: settings.powerups, ai: settings.ai, aiLevel: settings.aiLevel, hints: settings.hints })) {
     Object.assign(settings, synced);
     saveSettings();
     if (!$('#pSettings').classList.contains('hidden')) renderSettings();
@@ -472,13 +475,16 @@ socket.on('orb', () => {
 let aiThinking = false;
 let aiShots = []; // ms since the turn started at which Gemini takes a look
 let lastAiInk = 0;
-/** Gemini's looks (3 by default, each one request) are spread from 35% to 80% of the turn, at least 10s in and 6s apart. */
+/** Gemini's looks (each one request) are spread over the turn, at least 10s in and 6s apart.
+ *  Fair: 3 looks from 35% to 80%.  Easy (demo): 2 looks at 55% and 85%, so humans get first crack. */
 function planAiShots() {
   const dur = clock.duration || (state?.drawTime || 60) * 1000;
   const n = state?.aiLooks ?? 3;
+  const easy = state?.aiLevel === 'easy';
+  const [from, span] = easy ? [0.55, 0.3] : [0.35, 0.45];
   aiShots = [];
   for (let i = 0; i < n; i++) {
-    const t = Math.max(10000, dur * (n === 1 ? 0.6 : 0.35 + (0.45 * i) / (n - 1)));
+    const t = Math.max(10000, dur * (n === 1 ? from + span / 2 : from + (span * i) / (n - 1)));
     if (t < dur - 4000 && (!aiShots.length || t - aiShots[aiShots.length - 1] >= 6000)) aiShots.push(t);
   }
   lastAiInk = 0;
@@ -520,7 +526,7 @@ setInterval(() => {
         // Only spend a guess when the sculpture has changed since Gemini last looked.
         aiShots.shift();
         lastAiInk = ink;
-        socket.emit('ai:snapshot', { image: scene.snapshot(512) });
+        socket.emit('ai:snapshot', { image: scene.snapshot(state.aiLevel === 'easy' ? 320 : 512) });
       } else {
         aiShots[0] = elapsed + 3000; // nothing new yet — check again in 3s
       }
@@ -560,6 +566,11 @@ function renderSettings() {
     ? 'Game-show voice powered by ElevenLabs'
     : 'Using the browser voice: add <b>ELEVENLABS_API_KEY</b> to .env for the ElevenLabs voice';
   $('#swSound').classList.toggle('on', settings.sound);
+  for (const b of $('#segAiLevel').children) b.classList.toggle('on', b.dataset.v === settings.aiLevel);
+  for (const b of $('#segHints').children) b.classList.toggle('on', b.dataset.v === settings.hints);
+  const isDemo = Object.keys(DEMO).every((k) => k === 'ai' || JSON.stringify(settings[k]) === JSON.stringify(DEMO[k]));
+  $('#demoPreset').classList.toggle('on', isDemo);
+  $('#demoPreset').innerHTML = isDemo ? '✅&nbsp; Demo setup is on' : '🎬&nbsp; Use demo setup';
 }
 
 function changed() {
@@ -590,6 +601,19 @@ $('#customWords').addEventListener('input', (e) => {
   customTimer = setTimeout(changed, 400);
 });
 $('#swPowers').addEventListener('click', () => { settings.powerups = !settings.powerups; changed(); });
+$('#segAiLevel').addEventListener('click', (e) => {
+  const v = e.target.closest('button')?.dataset.v;
+  if (v) { settings.aiLevel = v; changed(); }
+});
+$('#segHints').addEventListener('click', (e) => {
+  const v = e.target.closest('button')?.dataset.v;
+  if (v) { settings.hints = v; changed(); }
+});
+$('#demoPreset').addEventListener('click', () => {
+  Object.assign(settings, DEMO, { ai: aiMeta.gemini });
+  announcer.enabled = settings.announcer;
+  changed();
+});
 $('#swAi').addEventListener('click', () => {
   if (!aiMeta.gemini) return;
   settings.ai = !settings.ai;
@@ -666,8 +690,10 @@ $('#pGameMenu').addEventListener('click', (e) => {
   if (e.target === $('#pGameMenu')) closeGameMenu(true);
 });
 
-// Kick players from the lobby.
+// Kick players from the lobby, or hand the 👑 leader role to someone.
 $('#lobbyPlayers').addEventListener('click', (e) => {
+  const lead = e.target.closest('[data-lead]')?.dataset.lead;
+  if (lead) { socket.emit('player:lead', { playerId: lead }); return; }
   const id = e.target.closest('[data-kick]')?.dataset.kick;
   if (!id) return;
   const p = state?.players.find((x) => x.id === id);
