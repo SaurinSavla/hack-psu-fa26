@@ -747,3 +747,29 @@ body.phone {
 }
 .gif-actions .dl-btn { background: var(--lime); color: var(--ink) !important; }
 .gif-actions .share-btn { background: rgba(61, 224, 255, 0.14); color: var(--cyan); border: 1px solid rgba(61, 224, 255, 0.4); }
+
+/* ---------- Sculpting tools: brush + 3D shapes ---------- */
+.tools {
+  display: flex; gap: 6px; overflow-x: auto; width: 100%; max-width: 440px; padding: 2px 2px 4px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.tools::-webkit-scrollbar { display: none; }
+.tools button {
+  flex: none; min-width: 52px; padding: 5px 6px 4px; border-radius: 12px;
+  background: rgba(19, 22, 43, 0.85); border: 1.5px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 1.15rem; line-height: 1.1;
+}
+.tools button span { font-size: 0.58rem; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
+.tools button.on { border-color: var(--lime); background: rgba(198, 255, 61, 0.14); }
+.tools button.on span { color: var(--text); }
+.tools .snap { border-style: dashed; }
+.tools .snap.on { border-style: solid; border-color: var(--cyan); background: rgba(61, 224, 255, 0.14); }
+.tools .sep { flex: none; width: 1px; background: var(--line); margin: 4px 2px; }
+.holdbtn.growing { animation: pulse 0.4s ease-in-out infinite alternate; }
+.depth.snapped { border-color: var(--lime); }
+.depth.snapped::after {
+  content: '🧲 surface'; position: absolute; left: 50%; bottom: -26px; transform: translateX(-50%);
+  white-space: nowrap; font-size: 0.6rem; font-weight: 800; color: var(--lime); text-transform: none; letter-spacing: 0;
+}
+.depth.snapped .knob, .depth.snapped .track { opacity: 0.35; }
+.draw-screen.peeking .tools { opacity: 0.3; pointer-events: none; }

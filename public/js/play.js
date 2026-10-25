@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { Sculpture } from './scene.js';
+import { SHAPES, shapeGeometry } from './shapes.js';
 import { MotionInput, requestMotionPermission } from './motion.js';
 import { $, esc, avatar, renderMask, pips, PhaseClock, setTimer } from './common.js';
 import { sfx, unlockAudio } from './sfx.js';
@@ -367,6 +368,13 @@ const draw = {
   // Fallback (no gyro): look around by dragging.
   yaw: 0,
   pitch: 0,
+  // Tool: 'brush' or a shape id. Snapping paints onto stamped shapes' surfaces.
+  tool: 'brush',
+  snap: true,
+  surf: null, // surface the current stroke is following { point, normal } (world space)
+  hover: null, // surface under the brush while not painting
+  grow: null, // shape being grown { t, start, anchor, normal, k }
+  spin: null, // finger dragging to spin the sculpture
   // Peeking at the sculpture from the audience's side, and where we last told viewers we stand.
   peek: false,
   lastEye: null,
@@ -423,8 +431,8 @@ function enterDraw() {
   if (motion.hasOrientation) motion.recenter();
   setDepthSlider(draw.depth);
   showCoach(motion.hasOrientation
-    ? `Point your phone at the TV and tap <b>⟲</b>.<br/><b>Hold the button</b> &amp; sweep to paint.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`
-    : `Drag the screen to look around.<br/><b>Hold the button</b> (or <b>Space</b>) to paint.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`, 7000);
+    ? `Point your phone at the TV and tap <b>⟲</b>.<br/><b>Hold the button</b> &amp; sweep to paint, or pick a <b>🧊 shape</b> below.<br/>Drag the <b>slider →</b> for depth, or <b>drag the scene</b> to spin.<br/><span class="small">Tap <b>?</b> anytime for help</span>`
+    : `Drag the screen to look around.<br/><b>Hold the button</b> (or <b>Space</b>) to paint, or pick a <b>🧊 shape</b> below.<br/>Drag the <b>slider →</b> to paint nearer or farther.<br/><span class="small">Tap <b>?</b> anytime for help</span>`, 7000);
 }
 
 // ---------- Coach tip (auto-hides as soon as you start sculpting) ----------
@@ -454,9 +462,11 @@ function helpSteps() {
       ? '<b>Paint:</b> hold the big button and sweep your phone through the air. Let go to stop.'
       : '<b>Paint:</b> hold the big button or the <b>Space</b> bar while you drag.'],
     ['↕️', '<b>Depth:</b> drag the <b>slider</b> on the right. Up = farther away, down = nearer. Your brush dot grows and shrinks to show it. You can move it while you paint.'],
-    ['🔄', '<b>Sides:</b> tap <b>◀ ▶</b> to spin your sculpture, then paint its sides and back. Use the slider to set how deep each new stroke goes.'],
+    ['🧊', '<b>Shapes:</b> pick a shape in the row (cube, cone, ring, star…), <b>hold</b> the big button to grow it and <b>let go</b> to place it. Point at another shape first to stack it right on its surface.'],
+    ['🧲', '<b>Paint on shapes:</b> point the brush at a shape. A <b>green ring</b> means you\'re on its surface, and the depth is automatic. Paint, and the ink follows the shape. On a flat face it stays in that plane. Tap <b>🧲 Snap</b> to switch this off.'],
+    ['🔄', `<b>See every side:</b> ${tilt ? '<b>drag sideways</b> on the scene, or tap ' : 'tap '}<b>◀ ▶</b> to spin your sculpture, then paint its sides and back.`],
     ['👁', '<b>Check it:</b> tap <b>👁</b> to see your sculpture from the audience\'s side. Tap the big button to get back to sculpting.'],
-    ['🎨', '<b>Tools:</b> pick a colour below, <b>●</b> changes brush size, <b>↶</b> undoes, <b>🗑</b> clears.'],
+    ['🎨', '<b>Tools:</b> pick a colour (it colours shapes too), <b>●</b> changes brush size, <b>↶</b> undoes the last stroke or shape, <b>🗑</b> clears.'],
   ];
   return steps.map(([ico, html]) => `<li><span class="ico">${ico}</span><span>${html}</span></li>`).join('');
 }
@@ -570,6 +580,7 @@ function startStroke() {
   if (!practicing && sculptureFull()) return;
   hideCoach(); // get the tip out of the way as soon as you start painting
   closeHelp();
+  draw.surf = surfaceAt(); // pointing at a shape? the stroke follows its surface
   draw.active = true;
   draw.strokeId = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
   const p = currentPoint();
@@ -589,6 +600,7 @@ function endStroke() {
   flushPoints(true);
   draw.active = false;
   draw.strokeId = null;
+  draw.surf = null;
   $('#holdBtn').classList.remove('active');
 }
 
@@ -641,27 +653,195 @@ function currentQuaternion(dt) {
   return tmpQ.setFromEuler(tmpE);
 }
 
-function currentPoint() {
-  const q = scene.camera.quaternion;
-  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
-  return dir.multiplyScalar(draw.depth);
+const UP = new THREE.Vector3(0, 1, 0);
+const aimDir = () => new THREE.Vector3(0, 0, -1).applyQuaternion(scene.camera.quaternion);
+const freePoint = () => aimDir().multiplyScalar(draw.depth);
+const brushOffset = () => SIZES[draw.sizeIdx].w * 0.9; // sit the ink on the surface, not inside it
+const SAME_SURFACE = 0.64; // cos(50°): follow curves smoothly, but don't jump around sharp edges
+
+/** The stamped shape surface the brush points at (world space), or null. */
+function surfaceAt() {
+  if (!draw.snap) return null;
+  return scene.pickSurface(scene.camera.position, aimDir());
 }
+
+/**
+ * Where the brush is (world space).
+ *  • Painting on a shape: follow its surface; past a flat face's edge, keep going in that face's plane.
+ *  • Pointing at a shape: sit on its surface (depth is automatic).
+ *  • Otherwise: along the aim at the depth-slider distance.
+ */
+function currentPoint() {
+  const o = scene.camera.position;
+  const dir = aimDir();
+  if (draw.active && draw.surf) {
+    const hit = draw.snap ? scene.pickSurface(o, dir) : null;
+    if (hit && hit.normal.dot(draw.surf.normal) > SAME_SURFACE) {
+      draw.surf = hit;
+      return hit.point.clone().addScaledVector(hit.normal, brushOffset());
+    }
+    const n = draw.surf.normal;
+    const denom = n.dot(dir);
+    if (Math.abs(denom) > 0.05) {
+      const t = n.dot(draw.surf.point.clone().sub(o)) / denom;
+      if (t > 0.05 && t < 6) return o.clone().addScaledVector(dir, t).addScaledVector(n, brushOffset());
+    }
+    return draw.last ? draw.last.clone() : freePoint();
+  }
+  if (draw.active) return freePoint();
+  draw.hover = surfaceAt();
+  if (draw.hover) return draw.hover.point.clone().addScaledVector(draw.hover.normal, brushOffset());
+  return freePoint();
+}
+
+// ---------- 3D shapes: pick one, hold to grow, release to place ----------
+
+function buildTools() {
+  $('#tools').innerHTML =
+    `<button data-t="brush" class="on" aria-label="Brush">🖌️<span>Brush</span></button>` +
+    `<button class="snap on" id="snapBtn" aria-label="Snap to surfaces">🧲<span>Snap</span></button><i class="sep"></i>` +
+    SHAPES.map(([id, label, icon]) => `<button data-t="${id}" aria-label="${label}">${icon}<span>${label}</span></button>`).join('');
+}
+buildTools();
+
+function holdLabel() {
+  if (draw.tool === 'brush') return 'Hold to<br />sculpt';
+  const def = SHAPES.find((x) => x[0] === draw.tool);
+  return `Hold to grow<br />${def ? def[1] : 'shape'}`;
+}
+
+function setTool(t) {
+  cancelShape();
+  endStroke();
+  draw.tool = t;
+  for (const b of $('#tools').querySelectorAll('button[data-t]')) b.classList.toggle('on', b.dataset.t === t);
+  if (!draw.peek) $('#holdBtn').innerHTML = holdLabel();
+  hideCoach();
+  if (t !== 'brush' && !setTool.tipped) {
+    setTool.tipped = true;
+    showCoach('<b>Hold</b> the button to grow your shape, <b>let go</b> to place it.<br/>Point at another shape first to stack it on its surface.', 4500);
+  }
+}
+$('#tools').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  vibrate(8);
+  if (b.id === 'snapBtn') {
+    draw.snap = !draw.snap;
+    b.classList.toggle('on', draw.snap);
+    showCoach(draw.snap ? '🧲 <b>Snap on:</b> point at a shape to paint on its surface.' : '🧲 <b>Snap off:</b> the depth slider controls where you paint.', 2200);
+    return;
+  }
+  setTool(b.dataset.t);
+});
+
+function canSculpt() {
+  if (screen !== 'sDraw' || draw.active || draw.grow || draw.peek) return false;
+  if (!practicing && performance.now() < countdownUntil) return false;
+  if (!practicing && !(state && state.phase === 'draw' && isDrawer())) return false;
+  if (!practicing && sculptureFull()) return false;
+  return true;
+}
+
+function startShape() {
+  if (!canSculpt()) return;
+  hideCoach();
+  closeHelp();
+  const hit = surfaceAt();
+  draw.grow = {
+    t: draw.tool,
+    start: performance.now(),
+    anchor: hit ? hit.point.clone() : freePoint(),
+    normal: hit ? hit.normal.clone() : null,
+    k: 0.06,
+  };
+  $('#holdBtn').classList.add('active', 'growing');
+  vibrate(15);
+}
+
+/** Shape placement in sculpture space: centre, rotation and size. */
+function shapeSpec(g) {
+  const anchor = scene.toSculpture(g.anchor);
+  const q = new THREE.Quaternion();
+  let center;
+  if (g.normal) {
+    // Stand it on the surface we pointed at, its base touching the surface.
+    const n = g.normal.clone().transformDirection(scene.turnInverse);
+    q.setFromUnitVectors(UP, n);
+    center = anchor.clone().addScaledVector(n, shapeGeometry(g.t).halfHeight * g.k);
+  } else {
+    // Floating: upright, front turned towards you, and growing AWAY from you (its front stays where you aimed).
+    const eye = scene.eye();
+    q.setFromAxisAngle(UP, Math.atan2(eye.x - anchor.x, eye.z - anchor.z));
+    const away = anchor.clone().sub(eye).setY(0);
+    if (away.lengthSq() < 1e-6) away.set(0, 0, -1);
+    away.normalize();
+    center = anchor.clone().addScaledVector(away, shapeGeometry(g.t).halfDepth * g.k);
+  }
+  return { t: g.t, color: draw.color, center, q, k: g.k };
+}
+
+function growTick(now) {
+  const g = draw.grow;
+  const secs = (now - g.start) / 1000;
+  // Grows quickly at first, then slows so it's easy to stop at the size you want.
+  // Never bigger than the distance you aimed at, so a shape can't swallow your view.
+  const maxK = Math.min(1.2, Math.max(0.15, g.anchor.length() * 0.9));
+  g.k = Math.min(maxK, 0.06 + (maxK - 0.06) * (1 - Math.exp(-secs * 0.7)));
+  g.maxK = maxK;
+  scene.setGhost(shapeSpec(g));
+  $('#holdBtn').innerHTML = `Let go to<br />place · ${Math.round((g.k / maxK) * 100)}%`;
+  if (g.k > maxK * 0.985 && !g.maxed) {
+    g.maxed = true;
+    vibrate(30);
+  }
+}
+
+function endShape() {
+  const g = draw.grow;
+  if (!g) return;
+  draw.grow = null;
+  scene.setGhost(null);
+  $('#holdBtn').classList.remove('active', 'growing');
+  $('#holdBtn').innerHTML = holdLabel();
+  const spec = shapeSpec(g);
+  const id = `${(me?.playerId || 'x').slice(0, 4)}${Date.now().toString(36)}${draw.counter++}`;
+  const pts = [round(spec.center.x), round(spec.center.y), round(spec.center.z)];
+  const shape = { t: spec.t, q: spec.q.toArray().map((v) => Math.round(v * 10000) / 10000), k: Math.round(spec.k * 1000) / 1000 };
+  scene.addStroke({ id, color: draw.color, width: 0.02, pts, shape });
+  if (!practicing) socket.emit('draw:start', { id, color: draw.color, width: 0.02, p: pts, shape });
+  vibrate([20, 30, 40]);
+  sfx.join();
+}
+
+function cancelShape() {
+  if (!draw.grow) return;
+  draw.grow = null;
+  scene.setGhost(null);
+  $('#holdBtn').classList.remove('active', 'growing');
+}
+
+const holdStart = () => (draw.tool === 'brush' ? startStroke() : startShape());
+const holdEnd = () => {
+  endStroke();
+  endShape();
+};
 
 const holdBtn = $('#holdBtn');
 holdBtn.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   if (draw.peek) return setPeek(false); // while peeking, the big button means "back to sculpting"
   holdBtn.setPointerCapture(e.pointerId);
-  startStroke();
+  holdStart();
 });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => holdBtn.addEventListener(ev, endStroke));
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => holdBtn.addEventListener(ev, holdEnd));
 holdBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && screen === 'sDraw' && !e.repeat) { e.preventDefault(); startStroke(); }
+  if (e.code === 'Space' && screen === 'sDraw' && !e.repeat) { e.preventDefault(); holdStart(); }
 });
 window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space') endStroke();
+  if (e.code === 'Space') holdEnd();
 });
 window.addEventListener('keydown', (e) => {
   if (screen !== 'sDraw' || e.repeat || e.target.matches?.('input, textarea')) return;
@@ -693,7 +873,8 @@ function setPeek(on, force = false) {
     scene.setDrawerEye(scene.eye().toArray()); // show yourself where you're standing
   }
   $('#sDraw').classList.toggle('peeking', on);
-  $('#holdBtn').innerHTML = on ? 'Back to<br />sculpting' : 'Hold to<br />sculpt';
+  cancelShape();
+  $('#holdBtn').innerHTML = on ? 'Back to<br />sculpting' : holdLabel();
   renderTurnBar();
   if (!force) vibrate(10);
 }
@@ -739,7 +920,13 @@ canvas.addEventListener('pointerdown', (e) => {
     lastTap = now;
     return;
   }
-  if (screen !== 'sDraw' || motion.hasOrientation) return;
+  if (screen !== 'sDraw') return;
+  if (motion.hasOrientation) {
+    // Drag sideways on the scene to spin your sculpture and see it from every angle.
+    draw.spin = { x: e.clientX };
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
   pointerNdc = { x: e.clientX, y: e.clientY };
   canvas.setPointerCapture(e.pointerId);
 });
@@ -758,6 +945,16 @@ canvas.addEventListener('pointermove', (e) => {
     updateViewUi();
     return;
   }
+  if (draw.spin && screen === 'sDraw') {
+    const dx = e.clientX - draw.spin.x;
+    draw.spin.x = e.clientX;
+    if (Math.abs(dx) > 0) {
+      hideCoach();
+      scene.turnBy(dx * 0.008);
+      renderTurnBar();
+    }
+    return;
+  }
   if (!pointerNdc) return;
   draw.yaw -= (e.clientX - pointerNdc.x) * 0.006;
   draw.pitch = Math.max(-1.4, Math.min(1.4, draw.pitch - (e.clientY - pointerNdc.y) * 0.006));
@@ -767,6 +964,7 @@ const endPointer = (e) => {
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinchDist = null;
   pointerNdc = null;
+  draw.spin = null;
 };
 ['pointerup', 'pointercancel'].forEach((ev) => canvas.addEventListener(ev, endPointer));
 canvas.addEventListener('wheel', (e) => {
@@ -825,6 +1023,10 @@ function frame(now) {
 
   const p = currentPoint();
   scene.setReticle(p, draw.color, draw.active);
+  const surf = draw.active ? draw.surf : draw.grow ? null : draw.hover;
+  scene.setSurfaceMarker(surf ? p : null, surf?.normal, draw.color);
+  $('#depthMeter').classList.toggle('snapped', !!surf);
+  if (draw.grow) growTick(now);
 
   if (draw.active && draw.strokeId) {
     if (p.distanceTo(draw.last) > 0.008) {

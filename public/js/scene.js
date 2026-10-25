@@ -11,6 +11,7 @@
 // stored and sent in "sculpture space"; only the drawer's own view is rotated (see turnBy / toSculpture).
 
 import * as THREE from 'three';
+import { makeShapeMesh, shapeGeometry } from './shapes.js';
 
 const TAU = Math.PI * 2;
 const smoothstep = (a, b, x) => {
@@ -215,6 +216,10 @@ export class Sculpture {
     this.frontMarker.visible = drawer;
     this.avatar.visible = !drawer;
     this.reticle.visible = drawer;
+    if (!drawer) {
+      this.setGhost(null);
+      this.setSurfaceMarker(null);
+    }
     this._applyTurn();
     if (drawer) {
       this.manual = null;
@@ -269,6 +274,75 @@ export class Sculpture {
 
   setProgressSource(fn) {
     this.progressFn = fn;
+  }
+
+  // ---------- shapes: picking surfaces, preview while growing ----------
+
+  /**
+   * Cast a ray (world space) and return the first stamped shape it hits:
+   * { point, normal } in world space, or null.
+   */
+  pickSurface(origin, dir, maxDist = 8) {
+    const meshes = [];
+    for (const st of this.strokes.values()) if (st.shape && st.mesh.visible) meshes.push(st.mesh);
+    if (!meshes.length) return null;
+    this.scene.updateMatrixWorld();
+    this._ray = this._ray || new THREE.Raycaster();
+    this._ray.set(origin, dir.clone().normalize());
+    this._ray.far = maxDist;
+    const hit = this._ray.intersectObjects(meshes, false)[0];
+    if (!hit || !hit.face) return null;
+    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+    if (normal.dot(dir) > 0) normal.negate(); // DoubleSide: face the camera
+    return { point: hit.point.clone(), normal };
+  }
+
+  /** Show a translucent preview of a shape being grown ({t, color, center, q, k} in sculpture space), or hide it. */
+  setGhost(g) {
+    if (!g) {
+      if (this.ghost) this.ghost.visible = false;
+      return;
+    }
+    if (!this.ghost || this.ghost.userData.t !== g.t) {
+      if (this.ghost) {
+        this.root.remove(this.ghost);
+        this.ghost.material.dispose();
+        this.ghost.children.forEach((c) => c.material?.dispose());
+      }
+      this.ghost = makeShapeMesh(g.t, g.color, { ghost: true });
+      this.ghost.userData.t = g.t;
+      this.ghost.raycast = () => {};
+      this.root.add(this.ghost);
+    }
+    this.ghost.material.color.set(g.color);
+    this.ghost.material.emissive.set(g.color);
+    this.ghost.position.copy(g.center);
+    this.ghost.quaternion.copy(g.q);
+    this.ghost.scale.setScalar(g.k);
+    this.ghost.visible = true;
+  }
+
+  /** A flat ring that hugs the surface under the brush (world space), or hide it. */
+  setSurfaceMarker(point, normal, color) {
+    if (!this.surfMarker) {
+      const m = new THREE.Mesh(
+        new THREE.RingGeometry(0.035, 0.05, 32),
+        new THREE.MeshBasicMaterial({ color: 0xc6ff3d, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false })
+      );
+      m.renderOrder = 11;
+      this.surfMarker = m;
+      this.scene.add(m);
+    }
+    const m = this.surfMarker;
+    if (!point) {
+      m.visible = false;
+      return;
+    }
+    m.visible = true;
+    m.position.copy(point).addScaledVector(normal, 0.004);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    m.scale.setScalar(Math.max(0.6, point.length()));
+    if (color) m.material.color.set(color);
   }
 
   // ---------- turntable (drawer) ----------
@@ -370,7 +444,7 @@ export class Sculpture {
   /** Total number of stroke points (used to tell whether the sculpture changed). */
   inkCount() {
     let n = 0;
-    for (const st of this.strokes.values()) n += st.points.length;
+    for (const st of this.strokes.values()) n += st.shape ? 40 : st.points.length;
     return n;
   }
 
@@ -460,8 +534,19 @@ export class Sculpture {
 
   // ---------- strokes ----------
 
-  addStroke({ id, color, width, pts }) {
+  addStroke({ id, color, width, pts, shape }) {
     if (this.strokes.has(id)) this.removeStroke(id);
+    if (shape) {
+      // A stamped solid shape: one point (its centre) plus rotation and size.
+      const mesh = makeShapeMesh(shape.t, color);
+      mesh.visible = false; // until its centre arrives
+      const st = { id, color, width: width || 0.02, points: [], mesh, dirty: false, lastBuild: 0, shape };
+      this.root.add(mesh);
+      this.strokes.set(id, st);
+      this.order.push(id);
+      if (pts && pts.length) this.appendPoints(id, pts);
+      return st;
+    }
     const mat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
@@ -480,6 +565,18 @@ export class Sculpture {
   appendPoints(id, pts) {
     const s = this.strokes.get(id);
     if (!s) return;
+    if (s.shape) {
+      if (s.points.length || pts.length < 3) return;
+      const c = new THREE.Vector3(pts[0], pts[1], pts[2]);
+      s.points.push(c);
+      const q = s.shape.q;
+      s.mesh.position.copy(c);
+      s.mesh.quaternion.set(q[0], q[1], q[2], q[3]);
+      s.mesh.scale.setScalar(s.shape.k);
+      s.mesh.visible = true;
+      this._expandShape(s);
+      return;
+    }
     for (let i = 0; i + 2 < pts.length; i += 3) {
       const v = new THREE.Vector3(pts[i], pts[i + 1], pts[i + 2]);
       s.points.push(v);
@@ -488,12 +585,29 @@ export class Sculpture {
     s.dirty = true;
   }
 
+  _disposeStroke(s) {
+    this.root.remove(s.mesh);
+    if (s.shape) {
+      // Shape geometry is shared between all shapes of that type; only the materials are per-mesh.
+      s.mesh.material.dispose();
+      s.mesh.children.forEach((c) => c.material?.dispose());
+    } else {
+      s.mesh.geometry.dispose();
+      s.mesh.material.dispose();
+    }
+  }
+
+  _expandShape(s) {
+    const r = shapeGeometry(s.shape.t).radius * s.shape.k;
+    const c = s.points[0];
+    this.bbox.expandByPoint(c.clone().addScalar(r));
+    this.bbox.expandByPoint(c.clone().addScalar(-r));
+  }
+
   removeStroke(id) {
     const s = this.strokes.get(id);
     if (!s) return;
-    this.root.remove(s.mesh);
-    s.mesh.geometry.dispose();
-    s.mesh.material.dispose();
+    this._disposeStroke(s);
     this.strokes.delete(id);
     this.order = this.order.filter((x) => x !== id);
     this._recomputeBounds();
@@ -507,12 +621,7 @@ export class Sculpture {
 
   clear() {
     this.cancelPlayback();
-    for (const id of [...this.strokes.keys()]) {
-      const s = this.strokes.get(id);
-      this.root.remove(s.mesh);
-      s.mesh.geometry.dispose();
-      s.mesh.material.dispose();
-    }
+    for (const id of [...this.strokes.keys()]) this._disposeStroke(this.strokes.get(id));
     this.strokes.clear();
     this.order = [];
     this.bbox.makeEmpty();
@@ -528,7 +637,7 @@ export class Sculpture {
     this.clear();
     const total = list.reduce((n, s) => n + s.pts.length / 3, 0) || 1;
     const job = { list, ms, start: performance.now(), done: 0, idx: 0, offset: 0, total };
-    list.forEach((s, i) => this.addStroke({ id: `p${i}`, color: s.color, width: s.width, pts: [] }));
+    list.forEach((s, i) => this.addStroke({ id: `p${i}`, color: s.color, width: s.width, pts: [], shape: s.shape }));
     this.playbackJob = job;
   }
 
@@ -557,10 +666,18 @@ export class Sculpture {
 
   _recomputeBounds() {
     this.bbox.makeEmpty();
-    for (const s of this.strokes.values()) for (const v of s.points) this.bbox.expandByPoint(v);
+    for (const s of this.strokes.values()) {
+      if (s.shape) {
+        if (s.points.length) this._expandShape(s);
+      } else for (const v of s.points) this.bbox.expandByPoint(v);
+    }
   }
 
   _rebuild(s, now) {
+    if (s.shape) {
+      s.dirty = false;
+      return;
+    }
     // Throttle rebuilds of long, actively-growing strokes.
     if (s.points.length > 120 && now - s.lastBuild < 60) return;
     s.dirty = false;
