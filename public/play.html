@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Sculpt &amp; Spin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="phone">
+  <div class="bg-glow"></div>
+  <div class="stage hidden" id="stage"><canvas id="scene"></canvas></div>
+
+  <!-- JOIN -->
+  <section class="screen center" id="sJoin">
+    <div class="logo">Sculpt <span class="amp">&amp;</span><br /><span class="spin">Spin</span></div>
+    <div class="tag">Paint in the air. Guess the spin.</div>
+    <div class="field"><label for="name">Your name</label><input id="name" maxlength="14" autocomplete="nickname" placeholder="e.g. Maya" /></div>
+    <div class="field"><label for="room">Room code</label><input id="room" class="code" maxlength="4" autocapitalize="characters" placeholder="ABCD" /></div>
+    <button class="btn wide" id="joinBtn">Join game</button>
+    <div class="err" id="joinErr"></div>
+    <button class="btn ghost wide hidden" id="joinGalleryBtn">🎞️ Your GIFs from the last game</button>
+    <div class="small">Hosting? Open <a href="/host">/host</a> on the laptop connected to the big screen.</div>
+  </section>
+
+  <!-- LOBBY -->
+  <section class="screen hidden lobby-screen" id="sLobby">
+    <div class="me" id="meCard"></div>
+    <div class="small center-text" id="lobbyMsg">You're in! Waiting for the host to start…</div>
+
+    <div class="card">
+      <div class="card-head"><b>Players <span class="chip" id="lobbyCount">0</span></b><span class="small" id="kickHint"></span></div>
+      <div class="plist" id="plist"></div>
+    </div>
+
+    <div class="card" id="settingsCard">
+      <div class="card-head"><b>Game settings</b><span class="small" id="settingsWho"></span></div>
+      <div id="settingsView" class="summary-chips"></div>
+      <div id="settingsEdit" class="hidden">
+        <div class="mrow"><span>Rounds</span><div class="seg sm" id="pRounds"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div></div>
+        <div class="mrow"><span>Time</span><div class="seg sm" id="pTime"><button data-v="30">30s</button><button data-v="60">60s</button><button data-v="90">90s</button><button data-v="180">180s</button></div></div>
+        <div class="mrow col"><span>Word packs</span><div class="pack-chips" id="pPacks"></div></div>
+        <div class="mrow"><span>Power-ups</span><button class="switch sm" id="pPowers"></button></div>
+        <div class="mrow hidden" id="pAiRow"><span>🤖 Gemini AI rival</span><button class="switch sm" id="pAi"></button></div>
+      </div>
+    </div>
+
+    <div class="sensor-test">
+      <div class="tiltpad"><i id="tiltDot"></i></div>
+      <div>
+        <div id="sensorStatus" class="small">Checking motion sensors…</div>
+        <div class="small" id="shakeStatus" style="margin-top:6px">Shake your phone to test 🫨</div>
+      </div>
+    </div>
+    <button class="btn ghost wide" id="practiceBtn">✨ Practice sculpting</button>
+    <button class="btn ghost wide hidden" id="lobbyGalleryBtn">🎞️ Last game's GIFs</button>
+    <button class="btn wide hidden" id="vipStart">Start game</button>
+    <div class="err" id="lobbyErr"></div>
+  </section>
+
+  <!-- CHOOSE (drawer) -->
+  <section class="screen center hidden" id="sChoose">
+    <div class="small">Your turn to sculpt! Pick one:</div>
+    <div class="choice-list" id="choices"></div>
+    <div class="small" id="chooseTimer"></div>
+  </section>
+
+  <!-- WAIT (non-drawer during choose) -->
+  <section class="screen center hidden" id="sWait">
+    <div class="me" id="waitCard"></div>
+    <div class="small" id="waitMsg"></div>
+  </section>
+
+  <!-- DRAW (drawer) -->
+  <section class="screen draw-screen hidden" id="sDraw">
+    <div class="draw-top">
+      <div class="secret"><small id="drawLabel">Sculpt this</small><b id="secretWord"></b></div>
+      <div style="display:flex; gap:8px; align-items:center">
+        <div class="timer" id="drawTimer"><span id="drawTimerText">0</span></div>
+        <button class="icon-btn" id="recenterBtn" title="Recenter">⟲</button>
+      </div>
+    </div>
+    <div class="depth" id="depthMeter"><span>far</span><div class="knob" id="depthKnob"></div><span>near</span></div>
+    <div class="coach" id="coach"></div>
+    <div class="draw-bottom">
+      <div class="swatches" id="swatches"></div>
+      <div class="draw-row">
+        <div class="side-tools">
+          <button class="icon-btn" id="undoBtn" title="Undo">↶</button>
+          <button class="icon-btn" id="clearBtn" title="Clear">🗑</button>
+        </div>
+        <button class="holdbtn" id="holdBtn">Hold to<br />sculpt</button>
+        <div class="side-tools">
+          <button class="icon-btn" id="sizeBtn" title="Brush size">●</button>
+          <button class="icon-btn" id="lockBtn" title="Depth lock">🔓</button>
+        </div>
+      </div>
+      <button class="btn ghost hidden" id="practiceDone">Done practicing</button>
+    </div>
+  </section>
+
+  <!-- GUESS (everyone else) -->
+  <section class="screen guess-screen hidden" id="sGuess">
+    <div class="guess-top">
+      <div>
+        <div class="who" id="guessWho"></div>
+        <div class="mask" id="guessMask"></div>
+      </div>
+      <div class="timer" id="guessTimer"><span id="guessTimerText">0</span></div>
+    </div>
+    <button class="view-chip hidden" id="autoView">🎥 Back to auto-spin</button>
+    <div class="shield-badge hidden" id="shieldBadge">🛡️ Shielded</div>
+    <div class="fx-fog hidden" id="fxFog"></div>
+    <div class="fx-label hidden" id="fxLabel"></div>
+    <div class="orb-grab hidden" id="orbGrab"><button id="orbBtn"><span>⚡</span>GRAB THE<br />POWER ORB</button></div>
+    <div class="sheet hidden" id="targetPick">
+      <div class="sheet-title" id="tpTitle"></div>
+      <div class="tp-list" id="tpList"></div>
+      <button class="btn ghost" id="tpCancel">Cancel</button>
+    </div>
+    <div class="sheet throw hidden" id="throwPrompt">
+      <div class="throw-ico" id="throwIco">🌫️</div>
+      <div class="sheet-title" id="throwTitle"></div>
+      <b class="flick">🫳 FLICK your phone to throw it!</b>
+      <button class="btn ghost" id="throwTap">or tap to throw</button>
+    </div>
+    <div class="orbit-hint" id="orbitHint">👆 Drag to spin it yourself · pinch to zoom</div>
+    <div class="guess-bottom">
+      <div class="powerbar hidden" id="powerbar"></div>
+      <div class="status" id="guessStatus"></div>
+      <div class="frozen-bar hidden" id="frozenBar"><i id="frozenFill"></i></div>
+      <div class="shake-prompt" id="shakePrompt"><span class="ico">📳</span><b>SHAKE TO GUESS</b></div>
+      <button class="btn ghost hidden" id="tapGuess">No motion? Tap to guess</button>
+      <form class="guess-form hidden" id="guessForm" autocomplete="off">
+        <input id="guessInput" placeholder="Type your guess…" maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" />
+        <button class="btn" type="submit">Go</button>
+      </form>
+      <div class="got-it hidden" id="gotIt"></div>
+    </div>
+  </section>
+
+  <!-- REVEAL -->
+  <section class="screen center hidden" id="sReveal">
+    <div class="small" id="revealLabel">It was</div>
+    <div class="result-word" id="revealWord"></div>
+    <div class="big-delta" id="revealDelta"></div>
+    <div class="small" id="revealRank"></div>
+  </section>
+
+  <!-- PODIUM -->
+  <section class="screen center hidden" id="sPodium">
+    <div class="small">Final place</div>
+    <div class="rank-big" id="finalRank"></div>
+    <div class="big-delta" id="finalScore"></div>
+    <div class="small" id="finalMsg"></div>
+    <div class="gif-head hidden" id="gifHead">🎞️ Sculpture GIFs <span class="small">Nothing is saved until you tap ⬇ Download</span></div>
+    <div class="my-gifs" id="myGifs"></div>
+    <button class="btn wide hidden" id="vipAgain">Play again</button>
+  </section>
+
+  <div class="phone-countdown hidden" id="phoneCountdown"></div>
+
+  <div class="gallery-sheet hidden" id="gallerySheet">
+    <div class="gs-head"><b>🎞️ Sculpture GIFs</b><button class="btn ghost" id="gsClose">Close</button></div>
+    <div class="small">Nothing is downloaded automatically. Tap <b>⬇ Download</b> on the ones you want (they stay here until you close this page).</div>
+    <div class="my-gifs" id="allGifs"></div>
+  </div>
+
+  <div class="phone-paused hidden" id="pausedOverlay"><div><b>⏸ Paused</b><span>The host paused the game. Hang tight!</span></div></div>
+
+  <script>
+    // If anything in the page breaks, show it instead of silently doing nothing.
+    window.addEventListener('error', function (e) {
+      // Ignore non-script resources (e.g. web fonts when offline); only real script errors matter.
+      if (e.target && e.target.tagName && e.target.tagName !== 'SCRIPT') return;
+      var b = document.getElementById('fatal');
+      if (!b) { b = document.createElement('div'); b.id = 'fatal'; document.body.appendChild(b); }
+      b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:99;padding:12px 16px;border-radius:12px;background:#ff5d73;color:#fff;font:600 14px system-ui;box-shadow:0 8px 30px rgba(0,0,0,.4)';
+      b.textContent = '⚠️ Something went wrong: ' + (e.message || 'a file failed to load') + ' — try Ctrl+F5 (hard refresh). If you just updated, make sure ALL files were replaced.';
+    }, true);
+  </script>
+  <script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/play.js"></script>
+</body>
+</html>

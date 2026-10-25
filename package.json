@@ -1,0 +1,27 @@
+{
+  "name": "sculpt-and-spin",
+  "version": "1.0.0",
+  "description": "Sculpt & Spin — a 3D air-sculpting party game for phones. Paint in the air, everyone else shakes to guess.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "bots": "node scripts/bots.js",
+    "check-ai": "node scripts/check-ai.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.22.3",
+    "gifenc": "^1.0.3",
+    "qrcode": "^1.5.4",
+    "selfsigned": "^5.5.0",
+    "socket.io": "^4.8.4",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
