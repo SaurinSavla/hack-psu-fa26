@@ -193,7 +193,7 @@ Sculpt & Spin was built at HackPSU Fall 2026. It stands on these open-source pro
 | [node-qrcode](https://github.com/soldair/node-qrcode) | Join and gallery QR codes | MIT |
 | [selfsigned](https://github.com/jfromaniello/selfsigned) | Local HTTPS certificate (phones only allow motion sensors over HTTPS) | MIT |
 | [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) via Google Fonts | Typography | SIL Open Font License |
-| [Bungee](https://fonts.google.com/specimen/Bungee), [Exo 2](https://fonts.google.com/specimen/Exo+2) and [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) via Google Fonts | Typography for the "64" theme (`public/css/theme-64.css`) | SIL Open Font License |
+| [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) and [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans) via Google Fonts | Pixel typography for the "64" theme (`public/css/theme-64.css`) | SIL Open Font License |
 | [Google Gemini API](https://ai.google.dev/gemini-api/docs) | The AI rival's guesses and the art-critic reviews | Google API terms |
 | [ElevenLabs API](https://elevenlabs.io/docs) | The game-show announcer voice | ElevenLabs terms |
 | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (optional) | Public HTTPS link when venue Wi-Fi blocks phones | Cloudflare terms |

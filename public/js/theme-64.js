@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Sculpture } from './scene.js';
 
 const SKY = 0x0a0f33;
-const PIXEL_SCALE = 0.55; // render at about half the screen resolution, then scale up without smoothing
+const PIXEL_SCALE = 0.38; // render at about a third of the screen resolution, then scale up without smoothing
 
 function checkerFloor(radius) {
   const c = document.createElement('canvas');
@@ -42,7 +42,13 @@ if (buildEnvironment) {
     buildEnvironment.call(this);
     this.scene.fog?.color.setHex(SKY);
     if (this.offscreen) this.renderer.setClearColor(SKY, 1);
-    if (this.stars) this.stars.material.size = 0.1; // bigger, blockier stars
+    if (this.stars) {
+      // Square pixel stars of a fixed screen size, like an old sprite starfield.
+      this.stars.material.sizeAttenuation = false;
+      this.stars.material.size = 2;
+      this.stars.material.opacity = 0.9;
+      this.stars.material.needsUpdate = true;
+    }
     if (this.floor) {
       const floor = checkerFloor(3.2);
       floor.position.copy(this.floor.position);
