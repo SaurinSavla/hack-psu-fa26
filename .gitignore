@@ -1,5 +1,6 @@
 node_modules/
 .certs/
+.data/
 .DS_Store
 .env
 check-voice.mp3
