@@ -190,7 +190,7 @@ function onPhaseChange(from, to) {
     $('#criticLine').classList.add('hidden');
     if (state.endReason !== 'guessed' && state.word) say(`Time's up! It was ${state.word}.`, { maxAgeMs: 5000 });
     // Let the showcase camera settle, then ask Gemini for a review.
-    if (state.settings.ai) setTimeout(() => {
+    if (state.settings.ai && state.aiCritic !== false && !aiResting()) setTimeout(() => {
       if (state?.phase === 'reveal') socket.emit('ai:critic', { image: scene.snapshot(640) });
     }, 1300);
   } else if (to === 'podium') {
@@ -280,7 +280,8 @@ function renderGame(s) {
   $('#board').classList.toggle('hidden', s.phase === 'podium');
   $('#board').innerHTML = ranked.map((p) => {
     const cls = ['row', p.guessed && 'guessed', p.id === s.drawerId && 'drawer', !p.connected && 'off', p.isAI && 'ai-row'].filter(Boolean).join(' ');
-    const tag = p.id === s.drawerId ? '<span class="tag">✏️</span>' : p.guessed ? '<span class="tag">✅</span>' : p.isAI && aiThinking ? '<span class="tag think">🤔</span>' : '';
+    const tag = p.id === s.drawerId ? '<span class="tag">✏️</span>' : p.guessed ? '<span class="tag">✅</span>'
+      : p.isAI && aiResting() ? `<span class="tag" title="${esc(s.aiStatus.reason)}">😴</span>` : p.isAI && aiThinking ? '<span class="tag think">🤔</span>' : '';
     const pw = s.settings.powerups && (p.powers || p.shielded) ? `<span class="pw">${p.shielded ? '🛡️' : ''}${p.powers ? `⚡${p.powers}` : ''}</span>` : '';
     const delta = s.phase === 'reveal' && p.delta ? `<span class="delta">+${p.delta}</span>` : '';
     return `<div class="${cls}" data-id="${p.id}" style="--c:${esc(p.color)}">${avatar(p)}<span class="nm">${esc(p.name)}</span>${tag}${pw}${delta}<span class="sc">${p.score}</span></div>`;
@@ -471,14 +472,18 @@ socket.on('orb', () => {
 let aiThinking = false;
 let aiShots = []; // ms since the turn started at which Gemini takes a look
 let lastAiInk = 0;
-/** First look ~12s in, then evenly spaced through the turn (up to 6 looks), so 30s and 180s turns both work. */
+/** Gemini's looks (3 by default, each one request) are spread from 35% to 80% of the turn, at least 10s in and 6s apart. */
 function planAiShots() {
   const dur = clock.duration || (state?.drawTime || 60) * 1000;
-  const gap = Math.max(12000, dur / 7);
+  const n = state?.aiLooks ?? 3;
   aiShots = [];
-  for (let t = 12000; t < dur - 4000 && aiShots.length < 6; t += gap) aiShots.push(t);
+  for (let i = 0; i < n; i++) {
+    const t = Math.max(10000, dur * (n === 1 ? 0.6 : 0.35 + (0.45 * i) / (n - 1)));
+    if (t < dur - 4000 && (!aiShots.length || t - aiShots[aiShots.length - 1] >= 6000)) aiShots.push(t);
+  }
   lastAiInk = 0;
 }
+const aiResting = () => state?.aiStatus && state.aiStatus.state !== 'ok';
 let lastPowerLine = 0;
 socket.on('ai:thinking', ({ on }) => {
   aiThinking = on;
@@ -506,8 +511,8 @@ socket.on('room:closed', () => goMenu());
 setInterval(() => {
   if (!state || !(state.phase === 'draw' || state.phase === 'choose')) return;
   if (state.paused) clock.sync(state); // keep the ring frozen while paused
-  // Gemini looks at the sculpture on a clock (not a % of the turn), seeing exactly what the TV shows.
-  if (state.phase === 'draw' && !state.paused && state.settings.ai && aiShots.length) {
+  // Gemini looks at the sculpture at the planned moments, seeing exactly what the TV shows.
+  if (state.phase === 'draw' && !state.paused && state.settings.ai && !aiResting() && aiShots.length) {
     const elapsed = clock.duration - clock.remaining();
     if (elapsed >= aiShots[0]) {
       const ink = scene.inkCount();
@@ -544,9 +549,12 @@ function renderSettings() {
   $('#swAi').classList.toggle('on', settings.ai && aiMeta.gemini);
   $('#swAi').disabled = !aiMeta.gemini;
   $('#swAi').style.opacity = aiMeta.gemini ? 1 : 0.4;
-  $('#aiNote').innerHTML = aiMeta.gemini
-    ? 'An AI player that guesses your sculptures from the TV view, and reviews each one'
-    : 'Off: add <b>GEMINI_API_KEY</b> to the .env file and restart the server';
+  const aiStatus = state?.aiStatus || aiMeta.status;
+  $('#aiNote').innerHTML = !aiMeta.gemini
+    ? 'Off: add <b>GEMINI_API_KEY</b> to the .env file and restart the server'
+    : aiStatus && aiStatus.state !== 'ok'
+      ? `😴 Sitting out: ${esc(aiStatus.reason)}`
+      : 'An AI player that guesses your sculptures from the TV view, and reviews each one';
   $('#swVoice').classList.toggle('on', settings.announcer);
   $('#voiceNote').innerHTML = aiMeta.tts
     ? 'Game-show voice powered by ElevenLabs'

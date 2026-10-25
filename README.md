@@ -39,16 +39,37 @@ Phones (same Wi-Fi):       https://192.168.x.x:3443
 
 1. Copy `.env.example` to a new file called `.env` (same folder as `server.js`).
 2. Paste your keys:
-   - `GEMINI_API_KEY`: free at [Google AI Studio](https://aistudio.google.com/apikey)
+   - `GEMINI_API_KEY`: from [Google AI Studio](https://aistudio.google.com/apikey), created in a **team project** (see below)
    - `ELEVENLABS_API_KEY`: from your [ElevenLabs settings](https://elevenlabs.io/app/settings/api-keys)
 3. Run `npm run check-ai`. It tests both keys and saves `check-voice.mp3` so you can hear the announcer.
 4. `npm start`. The terminal shows whether each AI feature is on.
 
 **What they do:**
-- **Gemini 🤖 joins every game as a player.** At 35%, 55% and 75% of each turn, the TV sends Gemini a snapshot of exactly what everyone is looking at, plus the word pattern. Gemini guesses (with a cheeky one-liner) and **if it's right it wins the turn**, scoring like a player (the sculptor still gets half). Players can throw power-ups at Gemini to blind it. At each reveal, Gemini reviews the sculpture like an art critic and scores it out of 10; the review also appears on the podium gallery.
+- **Gemini 🤖 joins every game as a player.** At about 35%, 58% and 80% of each turn, the TV sends Gemini a snapshot of exactly what everyone is looking at, plus the word pattern (it skips a look if the sculpture hasn't changed). Gemini guesses (with a cheeky one-liner) and **if it's right it wins the turn**, scoring like a player (the sculptor still gets half). Players can throw power-ups at Gemini to blind it. At each reveal, Gemini reviews the sculpture like an art critic and scores it out of 10; the review also appears on the podium gallery.
 - **The ElevenLabs announcer** voices the big moments on the TV: welcome, "you're up", the 3-2-1 countdown, correct guesses, Gemini's guesses and reviews, sabotage, power orbs, pause, and the winner. Lines are cached so repeats cost nothing. Without an ElevenLabs key it falls back to the browser's built-in voice.
 - Toggle both in **Settings** on the TV; the party leader can toggle Gemini from their phone. Removing Gemini from the lobby turns it off.
-- No keys? Everything else works as before. `AI_MOCK=1` fakes both services for testing.
+- No keys? Everything else works as before. `AI_MOCK=1` (or `npm run dev:mock`) fakes both services for testing.
+
+#### How much Gemini quota a game uses
+
+Every guess and every review is **one request**. By default that's up to 3 guesses + 1 review = **4 requests per turn**, so a 6-player, 2-round game is about **50 requests**. Change it with `GEMINI_GUESSES_PER_TURN` (0–6) and `GEMINI_CRITIC=0` in `.env`.
+
+Free-tier limits are counted **per Google Cloud project, per model**: a few requests per minute and a daily cap that resets at midnight Pacific time. Google changes these numbers often, so check your project's real limits on the [AI Studio rate-limit page](https://aistudio.google.com/rate-limit). The default model is `gemini-3.5-flash-lite`, the cheapest one with a free tier.
+
+When Google answers "quota exceeded", the server stops calling Gemini until the limit resets, the TV shows 😴 next to Gemini with the reason, and the game carries on without it. It comes back by itself (per-minute limits after a short break, daily limits after midnight Pacific).
+
+**Testing with bots spends quota too:** every bot game asks Gemini about every sculpture. Use `npm run dev:mock` (or `AI_MOCK=1`) while developing, and only switch the real key on for playtests and the demo.
+
+#### Getting a Gemini key that isn't anyone's personal key
+
+The key never leaves the server: the TV and phones only talk to `server.js`, which calls Gemini. So the only questions are whose quota it uses and who pays.
+
+1. **Make a team project.** Sign in to [AI Studio](https://aistudio.google.com/apikey) with a shared team Google account (or one person's, then add the others), and create the key in a **new project** named after the app, not in anyone's default project. In the [Cloud console IAM page](https://console.cloud.google.com/iam-admin/iam) add each teammate as a member, so anyone can see usage or rotate the key and it doesn't belong to one person.
+2. **Keep it in `.env` on the laptop that runs the server only.** Never commit it, paste it in chat, or put it in browser code. If a key leaks, delete it in AI Studio and make a new one.
+3. **For the demo, link a billing account to that project** (Tier 1). New Google Cloud accounts get [free-trial credits](https://cloud.google.com/free) and hackathon sponsors often hand out cloud credits (check that they apply to the Gemini API). Flash-Lite costs a fraction of a cent per request, so a whole game is a few cents. Set a [budget alert](https://console.cloud.google.com/billing/budgets) (e.g. $5) so nobody gets surprised. Paid tiers have much higher limits, so it won't run out mid-demo.
+4. **No billing at all?** Stay on the free tier: with the defaults above and mock mode for development, the daily free requests usually cover a few real games. If they run out, the game keeps working without the AI rival until the quota resets.
+
+Swapping in teammates' personal keys one after another isn't a real fix: it just spends each person's own quota, and a second key from the same project shares the same limit anyway.
 
 ### Testing alone
 
@@ -132,9 +153,10 @@ scripts/check-words.js  Checks the word packs for duplicates and typos
 | `PUBLIC_URL` | auto (LAN IP) | URL encoded in the QR code, e.g. a tunnel |
 | `CHOOSE_MS` / `REVEAL_MS` | `15000` / `8000` | Phase lengths |
 | `FORCE_POWER` | (unset) | Dev only: make every power-up one type, e.g. `fog` |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | (unset) / `gemini-3.5-flash` | Gemini AI rival + critic |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | (unset) / `gemini-3.5-flash-lite` | Gemini AI rival + critic |
+| `GEMINI_GUESSES_PER_TURN` / `GEMINI_CRITIC` | `3` / `1` | Gemini requests per turn: guesses (0–6) and the review (`0` = off) |
 | `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL` | (unset) / George / `eleven_flash_v2_5` | Announcer voice |
-| `AI_MOCK` | (unset) | `1` = fake both AI services (testing) |
+| `AI_MOCK` | (unset) | `1` = fake both AI services (testing); same as `npm run dev:mock` |
 
 ---
 

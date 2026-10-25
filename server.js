@@ -91,7 +91,7 @@ async function main() {
   app.get('/api/packs', (_req, res) => res.json({
     packs: packList(),
     powers: POWERS,
-    ai: { gemini: ai.geminiAvailable(), tts: ai.ttsAvailable(), mock: ai.MOCK },
+    ai: { gemini: ai.geminiAvailable(), tts: ai.ttsAvailable(), mock: ai.MOCK, status: ai.geminiStatus() },
   }));
   app.use(express.static(pub, { etag: true, lastModified: true }));
 
@@ -129,6 +129,19 @@ async function main() {
   const ack = (cb) => (typeof cb === 'function' ? cb : () => {});
   const qrFor = (url) => QRCode.toDataURL(url, { margin: 1, width: 360, color: { dark: '#0b0d1a', light: '#ffffff' } });
   const galleryUrlFor = (code) => `${phoneBase}/gallery/${code}`;
+
+  // When Gemini runs out of quota (or comes back), say so on the TV instead of the AI rival silently going quiet.
+  ai.onGeminiStatus((st) => {
+    console.warn(`[ai] Gemini ${st.state}${st.reason ? `: ${st.reason}` : ''}`);
+    for (const r of rooms.values()) {
+      if (!r.settings.ai) continue;
+      const text = st.state === 'ok' ? '🤖 Gemini is back in the game!'
+        : st.state === 'resting' ? `😴 ${st.reason} The AI rival sits out until then.`
+        : `🤖 Gemini is off: ${st.reason}`;
+      r.feed({ type: 'info', text });
+      r.broadcast();
+    }
+  });
 
   // ---------- ElevenLabs announcer ----------
   // The TV asks for a line of speech; only the host of a live room may use it (protects your API credits).
@@ -369,7 +382,8 @@ async function main() {
           console.log(`  first time — tap "Advanced" → "Proceed" / "Visit website".`);
         }
         if (ips.length > 1 && !PUBLIC_URL) console.log(`  Other LAN addresses: ${ips.slice(1).join(', ')}`);
-        console.log(`\n  🤖 Gemini AI rival:   ${ai.geminiAvailable() ? (ai.MOCK ? 'MOCK mode' : `on (${ai.GEMINI_MODEL})`) : 'off — add GEMINI_API_KEY to .env'}`);
+        const aiUse = `${ai.GUESSES_PER_TURN} guesses${ai.CRITIC ? ' + 1 review' : ''} per turn`;
+        console.log(`\n  🤖 Gemini AI rival:   ${ai.geminiAvailable() ? (ai.MOCK ? `MOCK mode (${aiUse})` : `on (${ai.GEMINI_MODEL}, ${aiUse})`) : 'off — add GEMINI_API_KEY to .env'}`);
         console.log(`  🎙️  ElevenLabs voice:  ${ai.ttsAvailable() ? (ai.MOCK ? 'MOCK mode' : `on (${ai.ELEVEN_MODEL})`) : 'off — add ELEVENLABS_API_KEY to .env'}`);
         console.log(`${line}\n`);
       });

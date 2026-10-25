@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "dev:mock": "node --watch server.js --mock-ai",
     "bots": "node scripts/bots.js",
     "check-ai": "node scripts/check-ai.js",
     "check-words": "node scripts/check-words.js"
