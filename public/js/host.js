@@ -73,6 +73,7 @@ function goMenu() {
   galleryTimer = null;
   showScreen('menu');
   scene.setMode('spin');
+  scene.setDrawerEye(null);
   scene.setFraming(0.72, 0.5, 1.1);
   scene.playback(demoStrokes(), 5000);
 }
@@ -146,6 +147,7 @@ function onPhaseChange(from, to) {
   clearInterval(galleryTimer);
   galleryTimer = null;
   $('#orbFlag').classList.add('hidden');
+  if (to !== 'draw' && to !== 'reveal') scene.setDrawerEye(null);
   if (to === 'lobby') {
     scene.setMode('spin');
     scene.clear(); // the lobby is busy enough; keep just the starfield
@@ -393,6 +395,7 @@ socket.on('stroke:clear', () => {
   if (state && state.phase !== 'lobby' && state.phase !== 'podium') scene.clear();
 });
 socket.on('cursor', ({ p, drawing, color }) => scene.setCursor(p, color, drawing));
+socket.on('drawer:view', ({ e }) => scene.setDrawerEye(e));
 
 // ---------- feed, buzz, power-ups ----------
 

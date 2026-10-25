@@ -343,6 +343,13 @@ async function main() {
       }
     });
 
+    socket.on('draw:view', (data = {}) => {
+      // Where the sculptor "stands" after spinning their sculpture on the turntable, so viewers can show them there.
+      if (!room || !playerId || !room.canDraw(playerId)) return;
+      const e = Array.isArray(data.e) && data.e.length === 3 && data.e.every((v) => Number.isFinite(v) && Math.abs(v) <= 10) ? data.e : null;
+      if (e) socket.to(room.channel).emit('drawer:view', { e });
+    });
+
     socket.on('disconnect', (reason) => {
       if (process.env.DEBUG) console.log('disconnect', socket.id, reason);
       if (room) room.dropSocket(socket.id);
