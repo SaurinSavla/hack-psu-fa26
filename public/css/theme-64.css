@@ -1,0 +1,225 @@
+/* "64" theme: a late-90s console look layered on top of style.css.
+   Chunky plastic buttons with a hard 3D edge, thick black outlines, the classic red / yellow / green / blue,
+   a blocky title font, pixel-font numbers, letter tiles, a checkerboard backdrop and faint CRT scanlines.
+   To turn it off, remove the theme-64 <link> and <script> tags from host.html and play.html. */
+
+:root {
+  --ink: #0a0f33;
+  --ink-2: #141c55;
+  --ink-3: #1e2a78;
+  --line: rgba(255, 255, 255, 0.22);
+  --text: #ffffff;
+  --muted: #b4bdf5;
+  --coral: #ff3d3d;
+  --lime: #ffd23f;
+  --cyan: #3db4ff;
+  --amber: #ff9f1c;
+  --violet: #a46bff;
+  --radius: 14px;
+  --display: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Press Start 2P', ui-monospace, monospace;
+  --block: 'Bungee', 'Exo 2', system-ui, sans-serif;
+
+  --red64: #ff3d3d;
+  --yellow64: #ffd23f;
+  --green64: #2fd158;
+  --blue64: #2f5bff;
+  --edge: #05071c;
+  --outline: 3px solid var(--edge);
+  --bevel: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.28);
+  --plastic: linear-gradient(180deg, #24318c, #141c55);
+}
+
+html, body { background: var(--ink); }
+
+/* Checkerboard backdrop (64px tiles) and a soft blue glow. */
+.bg-glow {
+  background:
+    radial-gradient(70vmax 55vmax at 20% 0%, rgba(47, 91, 255, 0.35), transparent 60%),
+    radial-gradient(50vmax 40vmax at 90% 100%, rgba(255, 61, 61, 0.18), transparent 60%),
+    repeating-conic-gradient(rgba(255, 255, 255, 0.04) 0 25%, transparent 0 50%) 0 0 / 64px 64px;
+}
+
+/* CRT scanlines and vignette, over everything but never in the way of taps. */
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.35));
+}
+
+/* Pixels stay crisp when the 3D view is scaled up from its lower render resolution. */
+.stage canvas { image-rendering: pixelated; }
+
+/* ---------- Type ---------- */
+.logo {
+  font-family: var(--block); font-weight: 400; letter-spacing: 0.01em; line-height: 0.95;
+  color: var(--yellow64);
+  text-shadow: 0.04em 0.04em 0 #c81e1e, 0.08em 0.08em 0 var(--edge);
+}
+.logo .amp { color: #fff; font-style: normal; text-shadow: 0.04em 0.04em 0 var(--blue64), 0.08em 0.08em 0 var(--edge); }
+.logo .spin {
+  background: linear-gradient(90deg, var(--red64), var(--yellow64) 35%, var(--green64) 65%, var(--blue64));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0.06em 0.06em 0 var(--edge));
+}
+.panel-head h2, .joincard h2, .players-head h2, .overlay .big, .rank-big, .result-word,
+.reveal-card .word, .gallery-box .cap, .paused-flag, .shake-prompt b, .secret b, .got-it b, .phone-paused b {
+  font-family: var(--block); font-weight: 400; letter-spacing: 0.01em;
+}
+.reveal-card .word, .result-word, .secret b {
+  color: var(--yellow64); text-shadow: 0.05em 0.05em 0 #c81e1e, 0.1em 0.1em 0 var(--edge);
+}
+.howto-card em, .throw .flick { color: var(--yellow64); }
+
+/* ---------- Buttons ---------- */
+.btn {
+  border-radius: 14px; border: var(--outline);
+  font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em;
+  background: var(--yellow64); color: var(--edge);
+  box-shadow: var(--bevel), 0 0.3em 0 var(--edge);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
+}
+.btn:active { transform: translateY(0.25em); box-shadow: var(--bevel), 0 0.05em 0 var(--edge); }
+.btn:disabled { filter: grayscale(0.7); box-shadow: var(--bevel); }
+.btn.ghost { background: var(--blue64); color: #fff; border: var(--outline); box-shadow: var(--bevel), 0 0.3em 0 var(--edge); }
+.btn.coral { background: var(--red64); color: #fff; box-shadow: var(--bevel), 0 0.3em 0 var(--edge); }
+.menu-buttons .btn .k, .menu-list .btn .k { font-size: 0.48em; font-style: normal; opacity: 0.75; }
+
+.icon-btn {
+  background: linear-gradient(180deg, #2c3aa6, #1a2380); border: var(--outline);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.28), 0 3px 0 var(--edge);
+}
+.icon-btn:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.28), 0 1px 0 var(--edge); }
+.help-btn { color: var(--yellow64); }
+#peekBtn.on { background: var(--cyan); color: var(--edge); border-color: var(--edge); }
+
+/* The big sculpt button looks like a console's A button. */
+.holdbtn {
+  border: 4px solid var(--edge); font-family: var(--block); font-weight: 400;
+  box-shadow: inset 0 6px 0 rgba(255, 255, 255, 0.35), inset 0 -8px 0 rgba(0, 0, 0, 0.25), 0 7px 0 var(--edge);
+}
+.holdbtn.active {
+  transform: translateY(5px);
+  box-shadow: inset 0 6px 0 rgba(255, 255, 255, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.25), 0 2px 0 var(--edge), 0 0 40px var(--hc, var(--red64));
+}
+
+/* ---------- Plastic panels ---------- */
+.panel, .joincard, .controls, .pcard, .board .row, .feed .item, .card, .sensor-test, .choice, .coach, .help-card,
+.sheet, .turn-bar, .rot-bar, .depth, .tools button, .take-home, .view-chip, .orbit-hint, .shield-badge, .fx-label,
+.power-toast, .toast, .my-gifs figure, .critic, .howto-card, .pack, .tp-list button, .depth-flash {
+  background: var(--plastic); border: var(--outline);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18), 0 4px 0 var(--edge);
+}
+.pcard.empty { background: rgba(255, 255, 255, 0.04); box-shadow: none; border: 3px dashed rgba(255, 255, 255, 0.25); }
+.panel-wrap, .phone-paused { background: rgba(5, 7, 28, 0.78); }
+
+.chip {
+  border-radius: 8px; border: 2px solid rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.1); color: var(--text); font-weight: 700;
+}
+.avatar {
+  border: 3px solid var(--edge); font-family: var(--block); font-weight: 400;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 3px 0 var(--edge);
+}
+
+/* Fades behind the HUD use the new navy. */
+.menu { background: linear-gradient(90deg, rgba(10, 15, 51, 0.95) 0%, rgba(10, 15, 51, 0.6) 48%, rgba(10, 15, 51, 0) 75%); }
+.lobby { background: rgba(10, 15, 51, 0.72); }
+.hud-top, .draw-top, .guess-top { background: linear-gradient(rgba(10, 15, 51, 0.9), transparent); }
+.draw-bottom { background: linear-gradient(transparent, rgba(10, 15, 51, 0.92) 35%); }
+.guess-bottom { background: linear-gradient(transparent, rgba(10, 15, 51, 0.94) 30%); }
+.overlay { background: radial-gradient(closest-side, rgba(10, 15, 51, 0.78), rgba(10, 15, 51, 0.35)); }
+.overlay.reveal { background: linear-gradient(rgba(10, 15, 51, 0.72), transparent 45%); }
+
+/* ---------- Word tiles, timer, scores ---------- */
+.mask .ch {
+  font-family: var(--mono); font-size: 0.62em; width: 1.7em; height: 1.9em;
+  border: 2px solid var(--edge); border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+}
+.mask .ch.shown { background: var(--yellow64); color: var(--edge); border-color: var(--edge); }
+.mask .ch.secret { background: var(--cyan); color: var(--edge); border-color: var(--edge); }
+.mask .sp { width: 0.5em; }
+
+.timer { box-shadow: 0 0 0 3px var(--edge), 0 4px 0 var(--edge); background: conic-gradient(var(--tc, var(--yellow64)) calc(var(--p) * 360deg), rgba(255, 255, 255, 0.12) 0); }
+.timer.low { --tc: var(--red64); }
+.timer span { font-size: 0.8em; }
+.pips i { border: 1px solid var(--edge); }
+.pips i.on { background: var(--yellow64); }
+
+.hud-top .round { font-size: 0.6em; line-height: 1.6; }
+.board .row .sc { font-size: 0.7em; }
+.board .delta, .feed .item .pts { font-size: 0.6em; }
+.board .row.guessed { border-color: var(--green64); background: linear-gradient(180deg, #1d7a3d, #10522a); }
+.board .row.drawer { border-color: var(--c); }
+.feed .item.correct { border-color: var(--green64); color: #8dffa9; }
+.feed .item.close { border-color: var(--amber); }
+.big-delta { font-size: 1.3rem; }
+
+.joincard .code {
+  font-family: var(--block); font-weight: 400; color: var(--yellow64); letter-spacing: 0.06em;
+  text-shadow: 0.05em 0.05em 0 #c81e1e, 0.1em 0.1em 0 var(--edge);
+}
+.joincard .url { font-family: var(--display); font-size: 0.85em; }
+.joincard img, .take-home img { border: var(--outline); }
+
+/* ---------- Countdowns and big moments ---------- */
+.countdown, .phone-countdown {
+  font-family: var(--block); font-weight: 400; color: var(--yellow64);
+  text-shadow: 0.05em 0.05em 0 #c81e1e, 0.1em 0.1em 0 var(--edge), 0 0 60px rgba(255, 210, 63, 0.45);
+}
+.countdown span.go, .phone-countdown span.go { color: #fff; text-shadow: 0.05em 0.05em 0 var(--blue64), 0.1em 0.1em 0 var(--edge); }
+.paused-flag { background: var(--plastic); border: var(--outline); color: var(--yellow64); box-shadow: 0 6px 0 var(--edge); }
+.orb-flag, .banner { border: var(--outline); box-shadow: var(--bevel), 0 4px 0 var(--edge); border-radius: 14px; }
+
+.podium .col .bar {
+  border: var(--outline); border-bottom: 0; box-shadow: var(--bevel);
+  font-family: var(--mono); font-size: 0.9em; color: var(--edge);
+}
+.podium .p1 .bar { background: var(--yellow64); }
+.podium .p2 .bar { background: var(--cyan); }
+.podium .p3 .bar { background: var(--red64); }
+
+/* ---------- Settings controls ---------- */
+.seg { background: var(--edge); border-radius: 12px; }
+.seg button { border-radius: 9px; }
+.seg button.on { background: var(--yellow64); color: var(--edge); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+.switch { border: var(--outline); background: #2a3270; }
+.switch.on { background: var(--green64); }
+.switch::after { box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+.pack.on { border-color: var(--yellow64); background: linear-gradient(180deg, #4a3d12, #2b2410); }
+.pack-chips button { border: 2px solid var(--edge); background: rgba(255, 255, 255, 0.08); }
+.pack-chips button.on { border-color: var(--yellow64); color: #fff; background: rgba(255, 210, 63, 0.18); }
+textarea.custom, .field input, .guess-form input {
+  border: var(--outline); border-radius: 12px; background: #fff; color: var(--edge); font-weight: 700;
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.15);
+}
+textarea.custom:focus, .field input:focus, .guess-form input:focus { border-color: var(--edge); box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.15), 0 0 0 3px var(--yellow64); }
+.field input.code { font-family: var(--mono); font-size: 1rem; }
+.field label { color: var(--yellow64); font-weight: 800; }
+
+/* ---------- Phone: sculpting tools ---------- */
+.tools button.on { background: var(--yellow64); border-color: var(--edge); }
+.tools button.on span { color: var(--edge); }
+.tools .snap.on { background: var(--cyan); border-color: var(--edge); }
+.tools .snap.on span { color: var(--edge); }
+.swatches button, .swatches .custom { border-radius: 8px; border: 3px solid var(--edge); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+.swatches button.on, .swatches .custom.on { border-color: #fff; outline: 2px solid var(--edge); }
+.swatches .custom::after { border-radius: 4px; }
+.depth .knob { background: var(--yellow64); color: var(--edge); border: var(--outline); box-shadow: 0 3px 0 var(--edge); }
+.depth .fill { background: linear-gradient(var(--red64), var(--yellow64), var(--green64)); opacity: 0.9; }
+.rot-bar .ax { background: var(--c, var(--plastic)); color: var(--edge); border: 2px solid var(--edge); box-shadow: var(--bevel), 0 3px 0 var(--edge); }
+.rot-bar .ax-0 { background: var(--yellow64); }
+.help-steps li .ico { border: 2px solid var(--edge); background: rgba(255, 255, 255, 0.1); }
+.choice { font-style: italic; font-weight: 900; }
+.choice:active { border-color: var(--yellow64); }
+
+/* ---------- Phone: guessing and power-ups ---------- */
+.powerbar button { background: linear-gradient(180deg, #7a45e6, #4b22a8); border: var(--outline); box-shadow: var(--bevel), 0 4px 0 var(--edge); }
+.powerbar .slot { border: 3px dashed rgba(255, 255, 255, 0.25); }
+.orb-grab button { border: 4px solid var(--edge); box-shadow: var(--bevel), 0 6px 0 var(--edge), 0 0 50px var(--amber); }
+.frozen-bar { border: 2px solid var(--edge); height: 12px; }
+.frozen-bar i { background: var(--cyan); }
+.gif-actions .dl-btn { background: var(--yellow64); border: 2px solid var(--edge); }
+.critic .score { color: var(--yellow64); }
