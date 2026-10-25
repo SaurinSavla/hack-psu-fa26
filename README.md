@@ -89,7 +89,9 @@ PUBLIC_URL=https://your-tunnel.trycloudflare.com npm start
 
 **Scoring:** the guesser earns `100 + 400 × fraction of time left` points, multiplied by difficulty (easy ×1, medium ×1.25, hard ×1.5). The **sculptor earns half** of that, so drawing clearly pays off. Nobody else scores that turn.
 
-**Word packs** live in `lib/words.js`: 🎨 Classic (120), 🎃 Spooky, 🦁 Penn State & HackPSU, 💻 Tech & Code, 🍕 Food and 🦒 Animals. Each is sorted into easy/medium/hard by how hard it is to sculpt and recognize in 3D. Mix packs in Settings, and paste your own **custom words** (comma or one per line; difficulty is guessed from length). An `ALIASES` map lists synonyms that also count (e.g. *carousel* = *merry go round*).
+**Word packs** live in `lib/words.js`, about 1,000 different words in all: 🎨 Classic (375), 🎃 Spooky (120), 🦁 Penn State & HackPSU, 💻 Tech & Code, 🍕 Food, 🦒 Animals (about 105 each), ⚽ Sports & Games, 🏠 Around the House, 🌋 Nature & Space and 🐉 Fantasy & Fairy Tales (70 each). Each is sorted into easy/medium/hard by how hard it is to sculpt and recognize in 3D. Mix packs in Settings, and paste your own **custom words** (comma or one per line; difficulty is guessed from length). An `ALIASES` map lists synonyms that also count (e.g. *carousel* = *merry go round*). After editing the packs, run `npm run check-words` to catch duplicates and typos.
+
+**No repeats:** a room never offers the same word twice until it has run out of fresh ones. The server also remembers which words were offered recently in *any* room (saved in `.data/recent-words.json`, so it survives restarts), so opening a new room or restarting the laptop doesn't bring back the same few words.
 
 **Take-home GIFs:** at the end, the laptop renders every sculpture as a spinning, captioned GIF (it builds up stroke by stroke, then does a full 360°). Each phone downloads every GIF as soon as it's ready and keeps it, even after **Play again** or the room closing, with **Save** and **Share** buttons (your own sculptures first). A **🎞️ Last game's GIFs** button appears in the lobby and join screens. The TV podium also shows a QR code for the full gallery page (`/gallery/ROOM`).
 
@@ -102,7 +104,7 @@ server.js        Express + Socket.IO; HTTP :3000 (host) and HTTPS :3443 (phones)
 lib/game.js      Game state machine: lobby → choose → draw → reveal → … → podium; scoring, hints, validation
 lib/ai.js        Gemini (guess + critic) and ElevenLabs (cached text-to-speech) clients
 lib/env.js       Tiny .env loader
-lib/words.js     Word packs tuned for 3D, sorted by difficulty, plus custom-word handling
+lib/words.js     Word packs tuned for 3D, sorted by difficulty, custom words, recently-played memory
 public/js/
   motion.js      DeviceOrientation → quaternion, recentering, wrist-twist depth, shake + flick detection
   scene.js       Three.js renderer: glowing tube strokes, reveal-orbit camera, drawer "magic window"
@@ -112,6 +114,7 @@ public/js/
   confetti.js    Confetti bursts
   gif.js         Renders a sculpture to a spinning, captioned GIF (gifenc) for the gallery
 scripts/bots.js  Bot players for solo testing
+scripts/check-words.js  Checks the word packs for duplicates and typos
 ```
 
 **Why orientation, not position?** A phone's accelerometer can't track position: integrating acceleration twice drifts tens of centimetres within a second. The gyroscope's **rotation** is accurate and stable, though. So the brush is projected along the direction the phone points (like a laser pointer onto a sphere around you), and the **wrist twist** around that axis sets the distance. That gives real, drift-free 3D strokes in any phone browser, with no AR framework required.

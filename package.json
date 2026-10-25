@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "bots": "node scripts/bots.js",
-    "check-ai": "node scripts/check-ai.js"
+    "check-ai": "node scripts/check-ai.js",
+    "check-words": "node scripts/check-words.js"
   },
   "license": "MIT",
   "dependencies": {
