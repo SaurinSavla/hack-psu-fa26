@@ -12,7 +12,15 @@ const clock = new PhaseClock();
 const scene = new Sculpture($('#scene'), { mode: 'reveal' });
 scene.setProgressSource(() => clock.progress());
 
-const SWATCHES = ['#ff5d73', '#ffb53d', '#ffe53d', '#c6ff3d', '#3de0ff', '#a77bff', '#ff7ad9', '#ffffff'];
+// Ink colours, as a spectrum. Besides the bright glow colours there are greens, browns, skin tones and
+// greys, so trees, animals and people look right. Every player colour is included, so your default ink matches you.
+const COLOR_NAMES = {
+  '#ff2e3a': 'Red', '#ff5d73': 'Coral', '#ffb3d1': 'Blush', '#ff7ad9': 'Pink', '#ff8a3d': 'Orange', '#ffb53d': 'Amber',
+  '#ffe53d': 'Yellow', '#c6ff3d': 'Lime', '#3dffa8': 'Mint', '#2ecc40': 'Green', '#1e7a3c': 'Forest green', '#7affef': 'Aqua',
+  '#3de0ff': 'Cyan', '#5d8bff': 'Blue', '#2343d6': 'Navy', '#d4a5ff': 'Lavender', '#a77bff': 'Violet', '#7b2ff7': 'Purple',
+  '#f1c27d': 'Sand', '#c68642': 'Tan', '#8b5a2b': 'Brown', '#ffffff': 'White', '#9aa3b5': 'Grey', '#5c6278': 'Charcoal',
+};
+const SWATCHES = Object.keys(COLOR_NAMES);
 const SIZES = [{ w: 0.012, label: '•' }, { w: 0.022, label: '●' }, { w: 0.04, label: '⬤' }];
 
 let me = null; // { playerId, name, color, code }
@@ -366,18 +374,44 @@ const draw = {
   lastEyeSent: 0,
 };
 
+// The last colour picked with the "any colour" picker is remembered on this phone.
+const isHex = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
+let customColor = isHex(localStorage.getItem('sns-ink')) ? localStorage.getItem('sns-ink') : '#ff9f1c';
+
 function buildSwatches() {
-  $('#swatches').innerHTML = SWATCHES.map((c) => `<button style="--c:${c}" data-c="${c}"></button>`).join('');
+  $('#swatches').innerHTML =
+    `<label class="custom" style="--c:${customColor}" title="Any colour" aria-label="Pick any colour"><input type="color" id="customColor" value="${customColor}" /></label>` +
+    SWATCHES.map((c) => `<button style="--c:${c}" data-c="${c}" title="${COLOR_NAMES[c]}" aria-label="${COLOR_NAMES[c]} ink"></button>`).join('');
 }
 buildSwatches();
 function setColor(c) {
   draw.color = c;
-  for (const b of $('#swatches').children) b.classList.toggle('on', b.dataset.c === c);
+  let preset = null;
+  for (const b of $('#swatches').querySelectorAll('button')) {
+    b.classList.toggle('on', b.dataset.c === c);
+    if (b.dataset.c === c) preset = b;
+  }
+  $('#swatches .custom').classList.toggle('on', !preset);
+  // Keep the chosen colour in view in the scrolling row.
+  const row = $('#swatches');
+  const sel = preset || $('#swatches .custom');
+  if (row.clientWidth) row.scrollLeft = sel.offsetLeft - (row.clientWidth - sel.offsetWidth) / 2;
   $('#holdBtn').style.setProperty('--hc', c);
 }
 $('#swatches').addEventListener('click', (e) => {
   const c = e.target.closest('button')?.dataset.c;
   if (c) { setColor(c); vibrate(10); }
+});
+$('#customColor').addEventListener('input', (e) => {
+  if (!isHex(e.target.value)) return;
+  customColor = e.target.value.toLowerCase();
+  localStorage.setItem('sns-ink', customColor);
+  $('#swatches .custom').style.setProperty('--c', customColor);
+  setColor(customColor);
+});
+// Tapping the picker when another colour is selected switches back to the remembered custom colour too.
+$('#customColor').addEventListener('click', () => {
+  if (draw.color !== customColor) setColor(customColor);
 });
 
 function enterDraw() {
